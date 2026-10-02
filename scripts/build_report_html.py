@@ -5,10 +5,14 @@ Example:
     python scripts/build_report_html.py
 """
 import base64
+import io
 import os
 import re
 
 import markdown
+from PIL import Image
+
+MAX_PX = 1800
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSS = """
@@ -30,8 +34,14 @@ def main():
     def embed(m):
         alt, path = m.group(1), m.group(2)
         p = os.path.normpath(os.path.join(ROOT, "report", path))
-        b64 = base64.b64encode(open(p, "rb").read()).decode()
-        return f"![{alt}](data:image/png;base64,{b64})"
+        # screen-resolution copy for the HTML; full-resolution PNGs stay in outputs/
+        im = Image.open(p).convert("RGB")
+        if im.width > MAX_PX:
+            im = im.resize((MAX_PX, round(im.height * MAX_PX / im.width)), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=88, optimize=True)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return f"![{alt}](data:image/jpeg;base64,{b64})"
 
     src = re.sub(r"!\[([^\]]*)\]\(([^)]+\.png)\)", embed, src)
     body = markdown.markdown(src, extensions=["tables", "fenced_code"])

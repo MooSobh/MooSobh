@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from wghadir import figures, pipeline as pl, qc  # noqa: E402
+from wghadir import export, figures, geodata, pipeline as pl, qc, terrain  # noqa: E402
 
 
 def _json(o):
@@ -30,6 +30,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--raw", default="data/raw", help="directory with the supplied raw files")
     ap.add_argument("--out", default="outputs", help="output directory")
+    ap.add_argument("--external", default="data/external",
+                    help="cache for the Copernicus DEM and EGM2008 windows (downloaded on first run)")
     ap.add_argument("--no-figures", action="store_true")
     a = ap.parse_args()
     tdir = os.path.join(a.out, "tables")
@@ -69,6 +71,28 @@ def main():
     ref["base_100"]["h_used"] = float((b["h_gnss"] - b["day_height_shift_m"]).median())
     ref["base_100"]["h_used_sd"] = float((b["h_gnss"] - b["day_height_shift_m"]).std(ddof=1))
     P["date"] = P["gnss_day"].map({v: k for k, v in day_of_date.items()})
+
+    # 5b external geodetic data: EGM2008 geoid and Copernicus GLO-30 DEM
+    bounds = (34.48, 24.45, 35.26, 25.07)  # survey + >= 22 km
+    dem_path = geodata.fetch_dem(bounds, os.path.join(a.external, "copernicus_glo30_wadi_ghadir.tif"))
+    geo_path = geodata.fetch_geoid(bounds, os.path.join(a.external, "egm2008_wadi_ghadir.tif"))
+    dem, geoid = geodata.Grid(dem_path), geodata.Grid(geo_path)
+    occ = pl.add_orthometric(occ, ref, geoid, dem)
+    f = occ[(occ["role"] == "field") & occ["match_status"].isin(pl.MATCH_OK)]
+    hchk = f.groupby("gnss_day").agg(n=("H_minus_dem_m", "size"),
+                                     median_h_ellip_minus_dem=("h_gnss_original", lambda v: np.nan),
+                                     median_H_minus_dem=("H_minus_dem_m", "median"),
+                                     mad_H_minus_dem=("H_minus_dem_m", lambda v: (v - v.median()).abs().median()),
+                                     day_shift_applied=("day_height_shift_m", "first")).reset_index()
+    hchk["median_h_ellip_minus_dem"] = [np.median(g["h_gnss_original"] - g["H_dem_m"]) for _, g in f.groupby("gnss_day")]
+    hchk["median_N_egm2008"] = [g["N_egm2008_m"].median() for _, g in f.groupby("gnss_day")]
+    hchk["median_H_minus_dem_without_day_shift"] = hchk["median_H_minus_dem"] + hchk["day_shift_applied"]
+    W(hchk, "21_height_datum_dem_check.csv")
+    summary["height_datum"] = dict(
+        median_h_ellipsoidal_minus_dem=float(np.median(f["h_gnss_original"] - f["H_dem_m"])),
+        median_N_egm2008=float(f["N_egm2008_m"].median()), N_range=[float(f["N_egm2008_m"].min()), float(f["N_egm2008_m"].max())],
+        median_H_minus_dem=float(f["H_minus_dem_m"].median()),
+        mad_H_minus_dem=float((f["H_minus_dem_m"] - f["H_minus_dem_m"].median()).abs().median()))
     W(P.drop(columns=["lat_text", "lon_text"], errors="ignore"), "07_gnss_points_all.csv")
 
     # 6 base control
@@ -101,8 +125,12 @@ def main():
     W(retie, "14_extrapolated_segment_reties.csv")
     summary["retie"] = retie.to_dict("records")
 
-    # 8 reductions
+    # 8 reductions, then 8b DEM topographic effect / complete Bouguer
     st = pl.reductions(occ, ref, k_apply=k_apply)
+    model = terrain.TopoModel(dem)
+    st = pl.terrain_stage(st, ref, model)
+    tval = pl.terrain_validation(model, st)
+    W(tval, "22_terrain_validation.csv")
 
     # rows table (all original rows + derived columns + decision)
     rows = df.merge(occ[["occ_id", "occ_key", "role", "match_status", "gnss_uid", "match_dist_m"]], on="occ_id", how="left")
@@ -121,6 +149,8 @@ def main():
     W(win, "19_nettleton_windows.csv")
     dbc = pl.day_boundary_check(prof, datum_days)
     W(dbc, "20_day_boundary_height_check.csv")
+    cons = pl.density_consensus(net, win)
+    W(cons, "23_density_consensus.csv")
 
     summary.update(dict(
         rows=int(len(df)), rows_accepted=int(df["accepted"].sum()),
@@ -134,10 +164,21 @@ def main():
     with open(os.path.join(a.out, "summary.json"), "w") as fh:
         json.dump(summary, fh, indent=2, default=_json)
 
+    # 10 deliverable exports: Excel workbook, GeoJSON, KML
+    ddir = os.path.join(a.out, "deliverables")
+    os.makedirs(ddir, exist_ok=True)
+    ectx = dict(st=st, prof=prof, net=net, sweeps=sweeps, win=win, cons=cons, ctrl=ctrl, ties=ties, closures=closures,
+                sc=sc, pairs=pairs, hchk=hchk, tval=tval, occ=occ, df=df, meta=meta)
+    final = export.write_workbook(os.path.join(ddir, "Wadi_Ghadir_Gravity_Results.xlsx"), ectx)
+    final.to_csv(os.path.join(ddir, "Wadi_Ghadir_Final_Stations.csv"), index=False, float_format="%.6f")
+    export.write_geojson(os.path.join(ddir, "Wadi_Ghadir_Final_Stations.geojson"), final)
+    export.write_kml(os.path.join(ddir, "Wadi_Ghadir_Final_Stations.kml"), final)
+
     if not a.no_figures:
         figures.make_all(dict(df=df, occ=occ, st=st, P=P, ctrl=ctrl, ties=ties, loo=loo, closures=closures,
                               pairs=pairs, sc=sc, retie=retie, win=win, dbc=dbc, datum_days=datum_days, closures_tab=closures, prof=prof, prof_sum=prof_sum, sweeps=sweeps, net=net,
-                              datum_marks=datum_marks, ref=ref, tide=tide), fdir)
+                              datum_marks=datum_marks, ref=ref, tide=tide, cons=cons, hchk=hchk, tval=tval,
+                              dem=dem, geoid=geoid, model=model), fdir)
     print(json.dumps({k: summary[k] for k in ("rows", "rows_accepted", "occupations", "products")}, indent=1))
 
 

@@ -592,23 +592,44 @@ def retie_extrapolated(occ, pairs, k, min_pairs=3):
 
 
 # ----------------------------------------------------------------------------- 8 reductions
-def reductions(occ, ref, k_apply=None, rho_list=(2.0, 2.2, 2.4, 2.5, 2.6, 2.67, 2.7, 2.8, 3.0)):
+RHO_LIST = (2.0, 2.2, 2.3, 2.4, 2.5, 2.6, 2.67, 2.7, 2.8, 2.9, 3.0)
+
+
+def add_orthometric(occ, ref, geoid, dem):
+    """EGM2008 orthometric heights H = h - N (GNSS heights shown to be ellipsoidal, report 3.3)
+    and the DEM height at each matched occupation for comparison."""
+    occ = occ.copy()
+    m = occ["lat"].notna()
+    occ.loc[m, "N_egm2008_m"] = geoid.sample(occ.loc[m, "lon"], occ.loc[m, "lat"])
+    occ["H_ortho_m"] = occ["h_used"] - occ["N_egm2008_m"]
+    occ.loc[m, "H_dem_m"] = dem.sample(occ.loc[m, "lon"], occ.loc[m, "lat"])
+    occ["H_minus_dem_m"] = occ["H_ortho_m"] - occ["H_dem_m"]
+    b = ref["base_100"]
+    b["N_egm2008"] = float(geoid.sample([b["lon"]], [b["lat"]])[0])
+    b["H_used"] = b["h_used"] - b["N_egm2008"]
+    b["H_dem"] = float(dem.sample([b["lon"]], [b["lat"]])[0])
+    return occ
+
+
+def reductions(occ, ref, k_apply=None, rho_list=RHO_LIST):
     """Base-relative free-air and simple Bouguer quantities for field occupations.
 
-    dFA = dg100 - [gamma(phi) - gamma(phi100)] + [FA(h) - FA(h100)]
-    dSB(rho) = dFA - 0.04193 rho (h - h100)
+    Heights are EGM2008 orthometric heights H.
+    dFA = dg100 - [gamma(phi) - gamma(phi100)] + [FA(H) - FA(H100)]
+    dSB(rho) = dFA - 0.04193 rho (H - H100)
     """
-    lat100, h100 = ref["base_100"]["lat"], ref["base_100"]["h_used"]
+    lat100, H100 = ref["base_100"]["lat"], ref["base_100"]["H_used"]
     s = occ[(occ["role"] == "field")].copy()
     s["product_ok"] = s["usable"] & s["dg100_mgal"].notna() & s["match_status"].isin(MATCH_OK)
     s["scale_factor_applied"] = 1.0
     if k_apply is not None:
         s.loc[s["instrument"] == "CG6-0313", "scale_factor_applied"] = k_apply
     s["dg100_scaled_mgal"] = s["dg100_mgal"] * s["scale_factor_applied"]
-    s["dh_m"] = s["h_used"] - h100
+    s["dh_m"] = s["H_ortho_m"] - H100
     s["normal_gravity_diff_mgal"] = reduce.normal_gravity_wgs84(s["lat"]) - reduce.normal_gravity_wgs84(lat100)
-    s["free_air_term_diff_mgal"] = reduce.free_air_term(s["lat"], s["h_used"]) - reduce.free_air_term(lat100, h100)
+    s["free_air_term_diff_mgal"] = reduce.free_air_term(s["lat"], s["H_ortho_m"]) - reduce.free_air_term(lat100, H100)
     s["dFA_rel_mgal"] = s["dg100_scaled_mgal"] - s["normal_gravity_diff_mgal"] + s["free_air_term_diff_mgal"]
+    s["u_slab_mgal_per_gcc"] = reduce.BOUGUER_K * s["dh_m"]
     for rho in rho_list:
         s[f"dSB_rel_rho{rho:.2f}_mgal"] = s["dFA_rel_mgal"] - reduce.bouguer_slab(rho, s["dh_m"])
     s["dFA_sigma_mgal"] = np.sqrt(s["dg100_sigma_mgal"] ** 2 + (0.3086 * s["h_sigma_m"]) ** 2)
@@ -616,7 +637,62 @@ def reductions(occ, ref, k_apply=None, rho_list=(2.0, 2.2, 2.4, 2.5, 2.6, 2.67, 
     return s
 
 
+def terrain_stage(st, ref, model, rho_list=RHO_LIST, progress=True):
+    """DEM topographic effect (unit density) and complete-Bouguer density sweep.
+
+    g1 = attraction of the DEM topography (geoid to surface, with curvature, 22 km) for 1 g/cm3.
+    dCB(rho) = dFA - rho [g1(station) - g1(base 100)]
+    TC(rho)  = rho [0.04193 H - g1]   (terrain + curvature correction relative to the slab)
+    """
+    from . import terrain
+
+    b = ref["base_100"]
+    g1b, nin, nout = model.unit_effect(b["lon"], b["lat"], b["H_used"])
+    b["g1_topo"] = g1b
+    st = st.copy()
+    idx = st.index[st["product_ok"]]
+    g1 = []
+    for k, i in enumerate(idx):
+        g1.append(model.unit_effect(st.at[i, "lon"], st.at[i, "lat"], st.at[i, "H_ortho_m"])[0])
+        if progress and k % 200 == 0:
+            print(f"  terrain: {k}/{len(idx)} stations", flush=True)
+    st["g1_topo_mgal_per_gcc"] = np.nan
+    st.loc[idx, "g1_topo_mgal_per_gcc"] = g1
+    st["u_topo_mgal_per_gcc"] = st["g1_topo_mgal_per_gcc"] - g1b
+    st["TC1_mgal_per_gcc"] = reduce.BOUGUER_K * st["H_ortho_m"] - st["g1_topo_mgal_per_gcc"]
+    st["TC_rho2.67_mgal"] = 2.67 * st["TC1_mgal_per_gcc"]
+    for rho in rho_list:
+        st[f"dCB_rel_rho{rho:.2f}_mgal"] = st["dFA_rel_mgal"] - rho * st["u_topo_mgal_per_gcc"]
+    st["dist_to_sea_km"] = np.nan
+    st.loc[idx, "dist_to_sea_km"] = terrain.distance_to_sea_km(model, st.loc[idx, "lon"].values, st.loc[idx, "lat"].values)
+    st["dem_coverage_22km"] = False
+    st.loc[idx, "dem_coverage_22km"] = [model.coverage_ok(lo, la) for lo, la in zip(st.loc[idx, "lon"], st.loc[idx, "lat"])]
+    return st
+
+
+def terrain_validation(model, st, n=12):
+    """Sensitivity of g1 to the zoning parameters on a spread of stations."""
+    from . import terrain
+
+    s = st[st["product_ok"]].sort_values("TC1_mgal_per_gcc")
+    pick = s.iloc[np.linspace(0, len(s) - 1, n).astype(int)]
+    fine = terrain.TopoModel(model.g, coarse=4)
+    rows = []
+    for _, r in pick.iterrows():
+        g0 = r["g1_topo_mgal_per_gcc"]
+        g_a = fine.unit_effect(r["lon"], r["lat"], r["H_ortho_m"], inner_coarse=16)[0]
+        g_b = model.unit_effect(r["lon"], r["lat"], r["H_ortho_m"], outer_radius=20000.0)[0]
+        g_c = model.unit_effect(r["lon"], r["lat"], r["H_ortho_m"] + 0.5)[0]
+        rows.append(dict(occ_key=r["occ_key"], TC1=r["TC1_mgal_per_gcc"], g1=g0,
+                         d_finer_outer_and_wider_inner=g_a - g0, d_outer_radius_20km=g_b - g0,
+                         d_station_height_plus_0_5m=g_c - g0))
+    return pd.DataFrame(rows)
+
+
 # ----------------------------------------------------------------------------- 9 Nettleton
+METHODS = {"simple": "u_slab_mgal_per_gcc", "complete": "u_topo_mgal_per_gcc"}
+
+
 def build_profiles(st, max_step_m=1000.0, min_n=15, min_relief_m=40.0):
     s = st[st["product_ok"]].copy()
     s["station_num"] = pd.to_numeric(s["station"], errors="coerce")
@@ -638,8 +714,8 @@ def build_profiles(st, max_step_m=1000.0, min_n=15, min_relief_m=40.0):
     for pid, p in P.groupby("profile_id"):
         summ.append(dict(profile_id=pid, instrument=p["instrument"].iloc[0], line=p["line"].iloc[0],
                          n_stations=len(p), dates=",".join(sorted(p["date"].unique())),
-                         length_km=p["chainage_m"].max() / 1000, h_min=p["h_used"].min(), h_max=p["h_used"].max(),
-                         relief_m=np.ptp(p["h_used"]), mean_spacing_m=p["chainage_m"].max() / max(len(p) - 1, 1),
+                         length_km=p["chainage_m"].max() / 1000, H_min=p["H_ortho_m"].min(), H_max=p["H_ortho_m"].max(),
+                         relief_m=np.ptp(p["H_ortho_m"]), mean_spacing_m=p["chainage_m"].max() / max(len(p) - 1, 1),
                          lat_c=p["lat"].mean(), lon_c=p["lon"].mean(),
                          n_extrapolated_drift=int(p["drift_mode"].str.startswith("EXTRAP").sum())))
     S = pd.DataFrame(summ)
@@ -682,12 +758,14 @@ def window_nettleton(P, window_m=3000.0, min_n=10, min_relief_m=30.0):
         edges = np.arange(0, p["chainage_m"].max() + window_m, window_m)
         for a, b in zip(edges[:-1], edges[1:]):
             w = p[(p["chainage_m"] >= a) & (p["chainage_m"] < b)]
-            if len(w) < min_n or np.ptp(w["h_used"]) < min_relief_m:
+            if len(w) < min_n or np.ptp(w["H_ortho_m"]) < min_relief_m:
                 continue
-            rho, se, rms = nettleton.regression_density(w["chainage_m"], w["dh_m"], w["dFA_rel_mgal"])
-            rows.append(dict(profile_id=pid, instrument=p["instrument"].iloc[0], window_start_m=a, window_end_m=b,
-                             n=len(w), relief_m=np.ptp(w["h_used"]), rho_regression=rho, rho_se=se,
-                             residual_rms_mgal=rms, lat_c=w["lat"].mean(), lon_c=w["lon"].mean()))
+            for method, ucol in METHODS.items():
+                rho, se, rms = nettleton.regression_density(w["chainage_m"], w[ucol], w["dFA_rel_mgal"])
+                rows.append(dict(profile_id=pid, method=method, instrument=p["instrument"].iloc[0],
+                                 window_start_m=a, window_end_m=b, n=len(w), relief_m=np.ptp(w["H_ortho_m"]),
+                                 rho_regression=rho, rho_se=se, residual_rms_mgal=rms,
+                                 lat_c=w["lat"].mean(), lon_c=w["lon"].mean()))
     return pd.DataFrame(rows)
 
 
@@ -698,15 +776,41 @@ def run_nettleton(P, S, value_col="dFA_rel_mgal"):
         p = p[~p["drift_mode"].str.startswith("EXTRAP")]
         if len(p) < 10 or np.ptp(p["dh_m"]) < 20:
             continue
-        sw = nettleton.sweep(p["chainage_m"], p["dh_m"], p[value_col])
-        sw["profile_id"] = r["profile_id"]
-        sweeps.append(sw)
-        rho, se, rms = nettleton.regression_density(p["chainage_m"], p["dh_m"], p[value_col])
-        ci, nb = nettleton.block_bootstrap(p["chainage_m"].values, p["dh_m"].values, p[value_col].values)
-        res.append(dict(profile_id=r["profile_id"], n_used=len(p), rho_zero_corr=nettleton.zero_crossing(sw),
-                        rho_regression=rho, rho_regression_se=se, residual_rms_mgal=rms,
-                        rho_boot_p2_5=ci[0], rho_boot_p50=ci[1], rho_boot_p97_5=ci[2], n_boot=nb,
-                        rho_min_roughness=sw.loc[sw["roughness_2nd_diff_mgal"].idxmin(), "rho"],
-                        corr_at_2_67=float(sw.loc[np.isclose(sw["rho"], 2.67), "corr_detrended"].iloc[0]),
-                        relief_m=r["relief_m"], length_km=r["length_km"]))
+        for method, ucol in METHODS.items():
+            sw = nettleton.sweep(p["chainage_m"], p["H_ortho_m"], p[ucol], p[value_col])
+            sw["profile_id"] = r["profile_id"]
+            sw["method"] = method
+            sweeps.append(sw)
+            rho, se, rms = nettleton.regression_density(p["chainage_m"], p[ucol], p[value_col])
+            ci, nb = nettleton.block_bootstrap(p["chainage_m"].values, p[ucol].values, p[value_col].values)
+            res.append(dict(profile_id=r["profile_id"], method=method, n_used=len(p),
+                            rho_zero_corr=nettleton.zero_crossing(sw),
+                            rho_regression=rho, rho_regression_se=se, residual_rms_mgal=rms,
+                            rho_boot_p2_5=ci[0], rho_boot_p50=ci[1], rho_boot_p97_5=ci[2], n_boot=nb,
+                            rho_min_roughness=sw.loc[sw["roughness_2nd_diff_mgal"].idxmin(), "rho"],
+                            corr_at_2_67=float(sw.loc[np.isclose(sw["rho"], 2.67), "corr_detrended"].iloc[0]),
+                            relief_m=r["relief_m"], length_km=r["length_km"]))
     return pd.concat(sweeps, ignore_index=True), pd.DataFrame(res)
+
+
+def density_consensus(net, win, se_max=1.0):
+    """Weighted mean and chi-square consistency of the density estimates per method."""
+    from scipy import stats
+
+    rows = []
+    for label, df, col, secol in (("profiles", net, "rho_regression", "rho_regression_se"),
+                                  ("3km_windows", win, "rho_regression", "rho_se")):
+        for method in METHODS:
+            d = df[(df["method"] == method) & (df[secol] < se_max)]
+            if len(d) < 2:
+                continue
+            w = 1 / d[secol] ** 2
+            m = float((d[col] * w).sum() / w.sum())
+            chi2 = float((((d[col] - m) / d[secol]) ** 2).sum())
+            dof = len(d) - 1
+            rows.append(dict(set=label, method=method, n=len(d), weighted_mean=m, weighted_se=float(1 / np.sqrt(w.sum())),
+                             median=float(d[col].median()), p25=float(d[col].quantile(0.25)),
+                             p75=float(d[col].quantile(0.75)), chi2=chi2, dof=dof,
+                             p_value=float(stats.chi2.sf(chi2, dof)), birge_ratio=float(np.sqrt(chi2 / dof)),
+                             weighted_se_scaled=float(1 / np.sqrt(w.sum()) * max(1.0, np.sqrt(chi2 / dof)))))
+    return pd.DataFrame(rows)

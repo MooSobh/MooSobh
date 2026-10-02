@@ -1,0 +1,10 @@
+{
+  "source": "Copernicus DEM GLO-30 (DSM), EGM2008 heights",
+  "tiles": {
+    "N24_00_E034_00": "read",
+    "N24_00_E035_00": "read",
+    "N25_00_E034_00": "read",
+    "N25_00_E035_00": "missing (open sea) - filled with 0 m"
+  },
+  "fraction_filled_with_zero": 0.03764433845085935
+}

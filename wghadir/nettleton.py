@@ -1,16 +1,20 @@
 """Nettleton (1939) density profiling along continuous traverses.
 
-For each trial density rho the base-relative simple Bouguer quantity along a
-profile is  B(rho) = FA_rel - 0.04193 rho dh.  A linear regional trend in
-chainage is removed from both B(rho) and dh; the density at which the
-residual B is uncorrelated with residual topography is the Nettleton estimate.
-This is algebraically identical to the Parasnis-type regression
-FA_rel = a + b x + rho * (0.04193 dh), which also yields a standard error.
+For a trial density rho the base-relative Bouguer quantity along a profile is
+
+    B(rho) = dFA - rho * u
+
+where u is the Bouguer effect for 1 g/cm3 relative to base 100:
+  simple Bouguer   u = 0.04193 * dH                      (infinite slab)
+  complete Bouguer u = g1(station) - g1(base 100)        (DEM prisms, see terrain.py)
+
+A linear regional trend in chainage is removed from B(rho) and from the station
+height; the density at which the residual B is uncorrelated with residual
+topography is the Nettleton estimate.  It equals the regression estimate from
+dFA = a + b x + rho * u, which also yields a standard error.
 """
 import numpy as np
 import pandas as pd
-
-from .reduce import BOUGUER_K
 
 RHO_GRID = np.round(np.arange(1.80, 3.2001, 0.01), 2)
 
@@ -21,12 +25,12 @@ def _detrend(x, y):
     return y - A @ coef
 
 
-def sweep(chain_m, dh, fa_rel, rho_grid=RHO_GRID):
+def sweep(chain_m, h, u, fa, rho_grid=RHO_GRID):
     x = np.asarray(chain_m, float) / 1000.0
-    h_res = _detrend(x, np.asarray(dh, float))
+    h_res = _detrend(x, np.asarray(h, float))
     rows = []
     for rho in rho_grid:
-        b = np.asarray(fa_rel, float) - BOUGUER_K * rho * np.asarray(dh, float)
+        b = np.asarray(fa, float) - rho * np.asarray(u, float)
         b_res = _detrend(x, b)
         r = np.corrcoef(b_res, h_res)[0, 1]
         rough = np.sqrt(np.mean(np.diff(b, 2) ** 2)) if len(b) > 2 else np.nan
@@ -35,11 +39,11 @@ def sweep(chain_m, dh, fa_rel, rho_grid=RHO_GRID):
     return pd.DataFrame(rows)
 
 
-def regression_density(chain_m, dh, fa_rel):
-    """rho and its standard error from FA_rel = a + b x + rho*(k dh)."""
+def regression_density(chain_m, u, fa):
+    """rho and its standard error from dFA = a + b x + rho * u."""
     x = np.asarray(chain_m, float) / 1000.0
-    z = BOUGUER_K * np.asarray(dh, float)
-    y = np.asarray(fa_rel, float)
+    z = np.asarray(u, float)
+    y = np.asarray(fa, float)
     A = np.column_stack([np.ones_like(x), x, z])
     coef, *_ = np.linalg.lstsq(A, y, rcond=None)
     res = y - A @ coef
@@ -49,16 +53,16 @@ def regression_density(chain_m, dh, fa_rel):
     return coef[2], np.sqrt(cov[2, 2]), np.sqrt(s2)
 
 
-def block_bootstrap(chain_m, dh, fa_rel, n_boot=2000, block=5, seed=1):
+def block_bootstrap(chain_m, u, fa, n_boot=2000, block=5, seed=1):
     """Moving-block bootstrap of the regression density (blocks of adjacent stations)."""
     rng = np.random.default_rng(seed)
-    n = len(dh)
-    x, z, y = (np.asarray(v, float) for v in (chain_m, dh, fa_rel))
+    n = len(u)
+    x, z, y = (np.asarray(v, float) for v in (chain_m, u, fa))
     starts = np.arange(0, max(n - block + 1, 1))
     est = []
     for _ in range(n_boot):
         idx = np.concatenate([np.arange(s, min(s + block, n)) for s in rng.choice(starts, int(np.ceil(n / block)))])[:n]
-        if np.ptp(z[idx]) < 1.0:
+        if np.ptp(z[idx]) < 0.04:
             continue
         est.append(regression_density(x[idx], z[idx], y[idx])[0])
     est = np.array(est)

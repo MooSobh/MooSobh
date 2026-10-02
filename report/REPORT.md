@@ -1,6 +1,6 @@
 # Wadi Ghadir gravity survey, Eastern Desert, Egypt (16–24 January 2026)
 
-## Processing, quality control and provisional base-relative reductions of the CG-6 data
+## Processing, quality control, terrain-corrected base-relative anomalies and density analysis of the CG-6 data
 
 **Prepared by:** Dr. Mohamed Sobh, LIAG
 **Date:** 2 October 2026
@@ -12,39 +12,40 @@
 
 **Ready for use**
 
-* Gravity differences relative to field base 100 (Δg₁₀₀) for **985 field occupations**. Of these, 531 come from CG-6 #0640 and 454 from CG-6 #0313. Each has row-level QC, a station-100 drift model, a coordinate-based GNSS match and a stated uncertainty. The median 1σ is 0.008 mGal for #0640 and 0.054 mGal for #0313.
+* Gravity differences relative to field base 100 (Δg₁₀₀) for **985 field stations**. Of these, 531 come from CG-6 #0640 and 454 from CG-6 #0313. Each has row-level QC, a station-100 drift model, a coordinate-based GNSS match and a stated uncertainty. The median 1σ is 0.008 mGal for #0640 and 0.054 mGal for #0313.
+* Free-air, simple Bouguer and **complete (terrain-corrected) Bouguer** anomalies relative to base 100, for 11 densities from 2.0 to 3.0 g/cm³. These are delivered as station tables (Excel/CSV/GeoJSON/KML), grids (NetCDF/XYZ) and 400-dpi maps.
 * An audit trail covering all 1 519 instrument rows, 1 116 occupations, 33 hotel–base ties, the base-100 control series and the inter-instrument comparison.
 
-**Provisional only**
+**Resolved since the first processing round**
 
-* Base-relative free-air (ΔFA) and simple Bouguer (ΔSB) quantities, with a density sweep from 2.0 to 3.0 g/cm³. They are provisional for four reasons:
-  * the vertical datum, geoid and antenna set-up of the GNSS heights are undocumented;
-  * the #0313 values depend on an inter-instrument scale factor estimated from the field data;
-  * no terrain correction has been applied;
-  * the day-7 (22 Jan) GNSS heights carry a +2.5 to +3.2 m offset, which I have adjusted.
+* **Height datum.** The GNSS heights are **ellipsoidal**. Height minus the Copernicus GLO-30 DEM (EGM2008 heights) has a median of +12.10 m, and the EGM2008 geoid undulation there is 12.32 m. After converting to orthometric heights, H = h − N(EGM2008), the stations agree with the DEM to a median −0.29 m (MAD 0.44 m). All reductions now use these orthometric heights. N varies by 1.2 m across the area, which would otherwise have biased the free-air values by up to 0.36 mGal.
+* **Terrain correction.** This was computed from the public Copernicus GLO-30 DEM with Harmonica prisms out to 22 km, including Earth curvature. At ρ = 2.67 g/cm³ it is 0.21–2.78 mGal (median 0.88 mGal), and its sensitivity to the zoning parameters is ≤ 0.08 mGal.
 
-**Not possible with the supplied data**
+**Provisional**
 
-* Absolute observed gravity. No absolute gravity value is available for base 100 or for the hotel station 0.
-* Absolute free-air, Bouguer or complete Bouguer anomalies.
-* A terrain correction. No DEM was supplied.
-* A measured Bouguer density. The Nettleton profiles do not agree on one value (§4.3).
+* All anomalies are relative to base 100. No absolute gravity tie exists.
+* The #0313 values depend on an inter-instrument scale factor estimated from the field data.
+* Red Sea water and bathymetry are not modelled. This mainly affects the 74 stations within 5 km of the coast.
+* The day-7 (22 Jan) GNSS heights carry a +2.5 to +3.2 m offset, which I adjusted by −2.83 m.
+
+**Density.** The terrain correction pulls the Nettleton densities together:
+
+* The best-constrained profiles give 2.71 ± 0.05, 2.77 ± 0.06, 2.91 ± 0.08 and 2.96 ± 0.29 g/cm³.
+* The 3-km window median falls from 3.15 g/cm³ (simple Bouguer) to 2.53 g/cm³ (complete Bouguer).
+* The estimates are still statistically inconsistent (χ²/dof ≈ 5.8), so I give no single measured density.
+
+**ρ = 2.67 g/cm³ is retained as the working density**, and the recommended map product is `CB_rel_2.67_mGal` (§4.3).
 
 **Problems found and corrected in processing**
 
 1. **#0313 tide correction.** The on-board tide was computed for the factory-default user position, 43.79 °N, 79.50 °W (Toronto). The error is up to 0.21 mGal (rms 0.090 mGal). I removed it and recomputed the tide at the station positions.
-2. **#0313 frozen sensor output.** 27 readings returned RawGrav ≈ 8008.33 mGal whatever the station was. Two further readings are gross outliers, up to 5 700 mGal off. All 29 are rejected. This left base 100 without a closing value on 18 Jan and without an opening value on 20 Jan.
-3. **#0313 scale.** #0313 reads a 1.19 % smaller gravity difference than #0640. The scale factor k = 1.01189 ± 0.00033 was estimated from 33 hotel–base ties and confirmed by co-located stations.
-4. **#0313 drift and tare.** A +0.56 mGal tare occurred on 16 Jan at base 100, and about −0.4 mGal/day of drift remains that the on-board correction does not remove. The base-100 drift model absorbs both.
-5. **Station-number collisions.** Point IDs are not global:
-   * #0640 has a field station "100" (Line 1, 17 Jan) that is not base 100.
-   * #0313 restarts station numbers on every line.
-   * The GNSS files use bare numbers for #0313 points on 17–18 Jan, and two IDs were converted to dates by Excel.
+2. **#0313 frozen sensor output.** 27 readings returned RawGrav ≈ 8008.33 mGal whatever the station was. Two further readings are gross outliers, up to 5 700 mGal off. All 29 are rejected.
+3. **#0313 scale.** #0313 reads a 1.19 % smaller gravity difference than #0640. k = 1.01189 ± 0.00033 comes from 33 hotel–base ties and is confirmed by co-located stations.
+4. **#0313 drift and tare.** A +0.56 mGal tare occurred on 16 Jan, and about −0.4 mGal/day of drift remains that the on-board correction does not remove. The base-100 drift model absorbs both.
+5. **Station-number collisions.** #0640 has a field station "100" (Line 1, 17 Jan) that is not base 100, and #0313 restarts station numbers on every line. The GNSS files use bare numbers for #0313 points on 17–18 Jan, and Excel converted two IDs to dates. All GNSS links are made by date and coordinates.
+6. **GNSS day-7 height offset.** Both base marks are 2.51 and 3.16 m too high on 22 Jan, so day-7 heights were reduced by 2.83 ± 0.32 m. The DEM comparison supports this: the day-7 median H − DEM is −0.82 m with the adjustment and +2.01 m without it.
 
-   All GNSS links are therefore made by date and coordinates.
-6. **GNSS day-7 height offset.** Both base marks are 2.51 m and 3.16 m too high on 22 Jan. Day-7 heights were reduced by 2.83 ± 0.32 m.
-
-**Not supplied:** no separate "Interacts" export is among the attachments. All 1 519 gravity rows come from two CG-6 serial numbers, and no other gravity data are inferred.
+**Not supplied:** no separate "Interacts" export is among the attachments. All 1 519 gravity rows come from two CG-6 serial numbers.
 
 ---
 
@@ -208,22 +209,30 @@ An occupation is a run of consecutive readings with the same instrument, date, L
 
 The 21 unmatched #0640 occupations are stations 106, 322–334, 351, 352, 382, 429 and 550, which have no GNSS point in either the workbook or the KML. Station 558 lies 38 m from the nearest point. A second "555" reading on 24 Jan was taken 450 m from station 555 near base 100. The 3 unmatched #0313 occupations are 18 Jan L5-19 (30.8 m) and two 22 Jan "L11-1" occupations whose CG-6 GPS positions lie 0.2–0.6 km from L11-1. All of them are kept in the tables and excluded from the products.
 
-**Height datum.** The GNSS heights were processed relative to MRSA, whose assumed height is 48.868 m (48.986 m on day 1). The data do not document:
+**Height datum: resolved with external data** (`21_height_datum_dem_check.csv`). The GNSS heights were processed relative to MRSA, whose assumed height is 48.868 m (48.986 m on day 1). The supplied files do not document the height type, frame, geoid or antenna heights, so I tested them against two public datasets:
 
-* whether the heights are ellipsoidal or orthometric;
-* the reference frame and epoch;
-* the geoid model;
-* the antenna or pole heights.
+* **Copernicus DEM GLO-30**: 1″ resolution, WGS84 horizontal, EGM2008 heights. Read from the public AWS bucket and cached in `data/external/`.
+* **EGM2008 geoid**: the 2.5′ grid from PROJ-data, NGA, public domain.
 
-The CG-6 internal GPS elevations are on average 12.1 m lower than the GNSS heights (sd 10.8 m). That is compatible with ellipsoidal GNSS heights and receiver heights above mean sea level (geoid undulation ≈ +10–12 m), but the scatter of the internal GPS is too large for this to count as evidence. **Height-dependent products are therefore provisional.**
+GNSS height minus DEM height has a median of **+12.10 m**, while the geoid undulation at the stations is **11.50–12.67 m** (median 12.32 m). The GNSS heights are therefore **ellipsoidal** (WGS84/ITRF realisation through MRSA).
 
-All reductions use heights relative to base 100, so a constant datum offset cancels. The variation of the geoid across the 27 × 17 km area does not cancel: it enters the free-air term at 0.31 mGal per metre. InstrHeight is 0 in all rows (sensor height above the mark not entered). A constant sensor-to-mark offset cancels in base-relative values only if the set-up was the same everywhere.
+I converted them to orthometric heights with H = h − N(EGM2008). The result agrees with the DEM to a median −0.29 m (MAD 0.44 m), which is within the GLO-30 vertical accuracy. 69 stations differ from the DEM by more than 3 m; these are narrow wadis and steep slopes, where a 30 m surface model is least reliable.
+
+Day-by-day median H − DEM is −0.04 to −0.57 m, except:
+
+* **Day 6:** −1.20 m. Only 63 stations, in an area with different terrain; not adjusted.
+* **Day 7:** −0.82 m. Without the −2.83 m adjustment it would be +2.01 m, which confirms that the adjustment is needed.
+
+A constant offset cancels in base-relative values; the N variation (1.2 m, i.e. up to 0.36 mGal in the free-air term) does not, and is now removed. InstrHeight is 0 in all rows. A sensor height of 0.2 m above the GNSS point is assumed in the terrain computation, and its effect is tested in §4.2.
+
+![Map 3](../outputs/maps/map03_height_check_vs_dem.png)
+*Map 3 – GNSS-derived orthometric height minus Copernicus GLO-30 at each station; scale clipped at ±3 m.*
 
 ![Fig. 9](../outputs/figures/fig09_gnss_checks.png)
 *Fig. 9 – Daily height of the two base marks relative to their multi-day median (left); separation between the CG-6 GPS position and the matched GNSS point (right).*
 
-![Fig. 1](../outputs/figures/fig01_coverage_map.png)
-*Fig. 1 – Field occupations matched to GNSS points, by instrument. ✕ marks occupations with no GNSS point within 30 m. The hotel station 0 lies ~31 km NNW of base 100.*
+![Map 1](../outputs/maps/map01_station_distribution.png)
+*Map 1 – Gravity stations by instrument on Copernicus GLO-30 relief (100 m contours); ✕ marks excluded occupations. The inset shows station 0 (hotel), ~31 km NNW of base 100.*
 
 ### 3.4 Base control and drift model (`10`–`13_*.csv`, Figs. 6–7)
 
@@ -294,106 +303,179 @@ The ratio is **k_tie = 1.01170 ± 0.00035**. The difference (0.76 mGal over a 66
 
 ---
 
-## 4  Reductions and density
+## 4  Reductions, terrain correction and density
 
 ### 4.1 Base-relative reductions (`16_field_stations_relative.csv`)
 
-All terms refer to base 100 (φ₁₀₀ = 24.786749 °N, h₁₀₀ = 111.77 m). h₁₀₀ is the median of the nine daily solutions after the day-7 adjustment (sd 0.17 m).
+All terms refer to base 100: φ₁₀₀ = 24.786749 °N, h₁₀₀ = 111.77 m (ellipsoidal), N₁₀₀ = 11.88 m, so **H₁₀₀ = 99.89 m**. The DEM gives 100.46 m at that point. Heights are EGM2008 orthometric heights, H = h − N.
 
 | Quantity | Equation | Sign convention |
 |---|---|---|
 | Observed difference | Δg₁₀₀ (scaled for #0313) | measured |
 | Normal gravity | γ(φ) − γ(φ₁₀₀), Somigliana closed form, WGS84 | subtracted |
-| Free-air | FA(h) − FA(h₁₀₀), FA(h) = (0.3087691 − 0.0004398 sin²φ) h − 7.2125×10⁻⁸ h² | added |
-| Simple Bouguer slab | 0.04193 ρ (h − h₁₀₀) mGal, ρ in g/cm³, h in m | subtracted |
+| Free-air | FA(H) − FA(H₁₀₀), FA(H) = (0.3087691 − 0.0004398 sin²φ) H − 7.2125×10⁻⁸ H² | added |
+| Bouguer slab | 0.04193 ρ (H − H₁₀₀) mGal, ρ in g/cm³, H in m | subtracted |
+| Topography (complete Bouguer) | ρ · [g₁(station) − g₁(base 100)], g₁ = DEM prism attraction for 1 g/cm³ (§4.2) | subtracted |
 
-The two products are
+The three anomaly products are
 
-  ΔFA = Δg₁₀₀ − [γ(φ) − γ(φ₁₀₀)] + [FA(h) − FA(h₁₀₀)]
+  ΔFA = Δg₁₀₀ − [γ(φ) − γ(φ₁₀₀)] + [FA(H) − FA(H₁₀₀)]
 
-  ΔSB(ρ) = ΔFA − 0.04193 ρ (h − h₁₀₀)
+  ΔSB(ρ) = ΔFA − 0.04193 ρ (H − H₁₀₀)
 
-ΔSB is tabulated for ρ = 2.00, 2.20, 2.40, 2.50, 2.60, 2.67, 2.70, 2.80 and 3.00 g/cm³.
+  ΔCB(ρ) = ΔFA − ρ [g₁(station) − g₁(base 100)]
 
-These are **differences relative to base 100**. They are not absolute free-air or Bouguer anomalies: adding the (unknown) anomaly of base 100 would convert them. If the GNSS heights are ellipsoidal, ΔFA is strictly a gravity-disturbance difference.
+ΔSB and ΔCB are tabulated for ρ = 2.00, 2.20, 2.30, 2.40, 2.50, 2.60, 2.67, 2.70, 2.80, 2.90 and 3.00 g/cm³. Adding the (unknown) absolute anomaly of base 100 converts them to absolute anomalies.
 
 **Ranges for the 985 product stations**
 
-| Quantity | Range |
-|---|---|
-| Height | 13.7–502.1 m |
-| Δh | −98 to +390 m |
-| Δg₁₀₀ | −94.4 to +18.3 mGal |
-| ΔFA | −14.9 to +37.0 mGal |
-| ΔSB(2.67) | −14.4 to +10.0 mGal |
+| Quantity | Range | Median |
+|---|---|---|
+| H | 2.2–489.5 m | 281.6 m |
+| ΔH | −98 to +390 m | |
+| Δg₁₀₀ | −94.4 to +18.3 mGal | |
+| ΔFA | −14.8 to +36.8 mGal | 24.9 mGal |
+| ΔSB(2.67) | −14.6 to +9.9 mGal | |
+| ΔCB(2.67) | −14.0 to +9.4 mGal | 2.3 mGal |
 
-**Uncertainty.** σ_h = 0.15 m nominal (the base-100 day-to-day scatter), plus 0.32 m in quadrature on day 7.
+**Uncertainty.** σ_H = 0.15 m nominal, with 0.32 m added in quadrature on day 7.
 
 | Median 1σ | #0640 | #0313 |
 |---|---:|---:|
-| Δg₁₀₀ | 0.008 mGal | 0.054 mGal |
 | ΔFA | 0.047 mGal | 0.071 mGal |
+| ΔSB(2.67) | 0.031 mGal | 0.061 mGal |
 
-**Density sensitivity.** ΔSB changes by 0.04193·Δρ·Δh. At the highest station (Δh = 390 m) a 0.1 g/cm³ change in density moves ΔSB by 1.6 mGal.
+**Density sensitivity.** ΔSB changes by 0.04193·Δρ·ΔH: at ΔH = 390 m, a 0.1 g/cm³ change moves it by 1.6 mGal.
 
-![Fig. 10](../outputs/figures/fig10_relative_anomaly_maps.png)
-*Fig. 10 – Height, ΔFA and ΔSB(2.67) relative to base 100. Provisional: no terrain correction and no absolute datum.*
+### 4.2 Terrain correction (`wghadir/terrain.py`, `22_terrain_validation.csv`)
 
-### 4.2 Terrain correction
+**DEM.** Copernicus DEM GLO-30, 1″ (≈ 30 m), EGM2008 heights, covering 34.48–35.26 °E and 24.45–25.07 °N. That is at least 22 km beyond every station; every station passes this coverage test.
 
-No DEM was supplied, so **no terrain correction was applied**, and the products are labelled simple Bouguer and provisional. `scripts/terrain_correction.py` is ready for when a DEM is available:
+* The tile N25 E035 does not exist (open sea), so 3.8 % of the window is set to 0 m.
+* Licence: Copernicus DEM © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA.
 
-* It builds a Harmonica prism layer from the DEM (top = DEM height, reference = 0 m, density ρ; negative heights get negative density).
-* It computes g_topo at the station and at base 100, and returns ΔCB = ΔFA − [g_topo(station) − g_topo(base 100)] and the classical terrain correction TC.
-* Its self-test reproduces the infinite-slab value to 0.1 % (33.553 against 33.586 mGal for a flat 300 m DEM).
+**Method.** For each station the DEM is converted into right-rectangular prisms with Fatiando a Terra Harmonica (`prism_gravity`, g_z), in a local Cartesian frame centred on the station:
 
-The DEM must:
+* **Inner zone:** 1″ cells within ±8 coarse cells (≈ ±2 km).
+* **Outer zone:** 8 × 8 block-averaged cells (≈ 240 m) out to 22 km (Hayford zone O).
+* **Prism extent:** from the geoid to the DEM surface. Both are lowered by d²/2R, so Earth curvature (the Bullard B effect) is included.
+* **Station cell:** DEM cells within 50 m of the station are set to the station height, so the station never sits inside a prism. The sensor is assumed 0.2 m above the GNSS point.
+* **Sea:** cells at ≤ 0 m carry no mass. Red Sea water and bathymetry are not modelled.
 
-* use the same vertical datum as the station heights (or be converted with a documented geoid model);
-* extend at least 22 km (preferably 167 km) beyond the survey;
-* have ≤ 30 m resolution near the stations, with a resolved near-zone (< 50 m), because the stations lie in wadis;
-* be validated against the GNSS heights at the stations.
+g₁ is the attraction of this topography for 1 g/cm³. Because g₁ is linear in density, one computation serves the whole density sweep. The classical terrain correction (including curvature) is TC = ρ (0.04193 H − g₁).
 
-### 4.3 Nettleton density test (`17`–`19_*.csv`, Figs. 11–12)
+**Validation.**
 
-**Profiles.** I used the actual traverses:
+* A flat 300 m DEM reproduces the infinite slab to 0.1 % (`scripts/terrain_correction.py --selftest`).
+* On 12 stations spanning the whole TC range, g₁ changes by:
+  * ≤ 0.002 mGal per g/cm³ when the outer cells are halved to 120 m and the inner zone doubled to ±4 km;
+  * up to 0.020 mGal per g/cm³ (0.054 mGal at 2.67) when the outer radius is cut from 22 to 20 km;
+  * 0.021–0.031 mGal per g/cm³ (≤ 0.08 mGal at 2.67) when the station is raised by 0.5 m.
 
-* each #0313 line;
-* the #0640 sequence, split where consecutive stations are more than 1 km apart.
+**Result.** At 2.67 g/cm³, TC ranges from 0.21 to 2.78 mGal (median 0.88 mGal). It is largest in the incised wadis of the south-west and along the steep valley west of base 100 (Map 8). Base 100 itself has g₁ = 3.77 mGal per g/cm³.
 
-Each profile is ordered by station number, and its chainage is the cumulative inter-station distance. Eligible profiles have ≥ 15 product stations and ≥ 40 m of relief, which gives 22 profiles, 2.7–30.4 km long with 52–338 m of relief. Stations with extrapolated drift are excluded.
+**Remaining limitations.**
 
-**Method.** For ρ from 1.80 to 3.20 g/cm³ in steps of 0.01, a linear regional trend in chainage is removed from ΔSB(ρ) and from Δh, and their correlation is computed. The density of zero correlation equals the regression estimate from ΔFA = a + b·x + ρ·(0.04193 Δh), which also gives a standard error and a 2 000-sample moving-block bootstrap interval (block = 5 stations). As a second test, the same regression was run in non-overlapping 3 km windows (≥ 10 stations, ≥ 30 m relief).
+* No bathymetry: the 74 stations within 5 km of the coast may be biased by up to a few tenths of a mGal, smoothly varying.
+* The DEM is a surface model (DSM).
+* Topography beyond 22 km is omitted; its effect is smooth across a 30 km survey and largely cancels in base-relative values.
 
-**Results.**
+![Map 8](../outputs/maps/map08_terrain_correction_2.67.png)
+*Map 8 – Terrain correction (ρ = 2.67 g/cm³) at the stations.*
 
-* **Whole profiles:** the regression densities range from −13.0 to +12.0 g/cm³. Only 6 of the 22 profiles have a zero crossing inside 1.8–3.2 g/cm³:
+### 4.3 Nettleton density test (`17`–`19_*.csv`, `23_density_consensus.csv`, `outputs/nettleton/`)
 
-  | Profile | ρ [g/cm³] |
-  |---|---|
-  | O-L3 | 2.94 ± 0.07 |
-  | N-L1-433-501 | 2.88 ± 0.09 |
-  | N-L1-301-335 | 3.01 ± 0.28 |
-  | N-L1-541-557 | 2.93 ± 0.73 |
-  | N-L1-1-148 | 3.03 ± 2.05 |
-  | O-L9 | 3.15 ± 0.13 |
+**Profiles.** The same 22 traverses as before are used (≥ 15 stations, ≥ 40 m relief, 2.7–30.4 km long). For each trial density ρ = 1.80–3.20 g/cm³:
 
-  Several profiles keep a correlation of ±0.5 to ±0.95 across the whole range. In those, the anomaly varies along the profile in ways a density adjustment cannot remove.
-* **3 km windows:** 51 windows qualify, and 17 have SE < 1 g/cm³. Those 17 give a median of 3.15 g/cm³ (IQR 2.23–3.42) and a weighted mean of 3.05 g/cm³. Their χ² is 57.7 for 16 degrees of freedom, so the windows are **mutually inconsistent**.
+* B(ρ) = ΔFA − ρ·u is formed, where u is the Bouguer effect for 1 g/cm³ relative to base 100:
+  * u = 0.04193 ΔH for the simple Bouguer;
+  * u = g₁(station) − g₁(base 100) for the complete Bouguer.
+* A linear trend in chainage is removed from B and from H, and their correlation is computed.
+* ρ is also estimated by regression, ΔFA = a + b·x + ρ·u, with a 2 000-sample moving-block bootstrap.
 
-**Why no single density is defensible.**
+Every profile has its own figure (`outputs/nettleton/nettleton_<profile>.png`) showing the topography, ΔCB for ρ = 2.0–3.0 in steps of 0.1, and both correlation curves.
 
-1. **The independent estimates disagree** well beyond their uncertainties (above).
-2. **No terrain correction.** The traverses follow wadis, so the stations sit below the surrounding relief. The missing terrain correction is largest where a station is low relative to its surroundings. Without it, ΔSB is too low at valley stations and correlates positively with height, which pushes the Nettleton density upward. The many estimates near or above 3.0 g/cm³ match this bias. They are not evidence of rock density.
-3. **Geology and regional field.** The long traverses (up to 30 km) cross changing basement geology and a regional gradient that a linear trend does not fully remove.
+**Results**
 
-**Provisional working value:** **ρ = 2.67 g/cm³**, the conventional crustal density. It is not a measured value. Sensitivity products for 2.0–3.0 g/cm³ are in `16_field_stations_relative.csv`. The Nettleton test should be repeated after terrain correction, on short profiles across individual topographic features. Laboratory densities of outcrop samples from the main lithologies would be the more reliable constraint.
+| Profile | Simple Bouguer ρ [g/cm³] | Complete Bouguer ρ [g/cm³] |
+|---|---|---|
+| O-L3 (#0313, 7.7 km, 108 m relief) | 2.93 ± 0.07 | **2.71 ± 0.05** |
+| O-L9 (#0313, 2.9 km, 102 m) | 3.15 ± 0.13 | **2.77 ± 0.06** |
+| N-L1-433-501 (#0640, 17.1 km, 162 m) | 2.87 ± 0.09 | **2.91 ± 0.08** |
+| N-L1-301-335 (#0640, 5.2 km, 78 m) | 3.01 ± 0.28 | **2.96 ± 0.29** |
+| O-L7 (#0313, 2.8 km, 69 m) | 5.85 ± 1.41 | **2.95 ± 0.26** |
+| O-L6 (#0313, 4.8 km, 72 m) | 3.21 ± 0.22 | 3.30 ± 0.19 |
+| N-L1-358-418 (#0640, 11.9 km, 143 m) | 1.63 ± 0.11 | 1.70 ± 0.13 |
+| N-L1-149-225 / N-L1-246-300 | −1.14 / −2.04 | −1.20 / −2.55 (non-physical) |
 
-![Fig. 11](../outputs/figures/fig11_nettleton_summary.png)
-*Fig. 11 – Left: correlation between detrended ΔSB and detrended Δh against trial density for the 22 profiles. Right: 3 km window density estimates (±1.96 SE) with SE < 1 g/cm³. The grey band marks 2.0–3.0 g/cm³ and the dashed line 2.67.*
+* **3 km windows** (SE < 1 g/cm³):
 
-![Fig. 12](../outputs/figures/fig12_nettleton_profiles.png)
-*Fig. 12 – Topography (top) and ΔSB minus its mean for ρ = 2.2, 2.67 and 3.0 g/cm³ (bottom), for the four profiles with the smallest regression standard error. No terrain correction is applied.*
+  | | n | median | IQR | weighted mean |
+  |---|---:|---:|---|---|
+  | Simple Bouguer | 16 | 3.15 | 2.10–3.43 | 3.05 ± 0.15 |
+  | Complete Bouguer | 32 | **2.53** | 1.57–3.02 | **2.79 ± 0.11** (SE scaled by the Birge ratio 2.4) |
+
+* **χ² consistency:** the windows give χ²/dof = 179.9/31 and the profiles 964/18 (complete Bouguer).
+
+**Interpretation**
+
+1. **The terrain correction matters.** With it, the most robust profiles (smallest SE, largest relief) all fall in **2.71–2.96 g/cm³**, and the window median drops from 3.15 to 2.53 g/cm³. This confirms that the earlier high values came from the missing terrain correction.
+2. **The estimates remain mutually inconsistent.** Several long #0640 traverses still give non-physical or very low values. Along them the anomaly correlates with topography for geological or regional reasons a linear trend does not remove: N-L1-149-225 climbs 240 m steadily towards the basement massif in the south-west, where ΔCB falls by 15 mGal.
+3. **Working density.** The robust-profile range 2.71–2.96 g/cm³ and the complete-Bouguer window mean 2.79 ± 0.11 g/cm³ bracket the standard value. **ρ = 2.67 g/cm³ is retained as the working reduction density, with 2.8 g/cm³ as a sensitivity alternative.** Both are tabulated. This is a reduction density, not a measured rock density; outcrop samples of the main lithologies are needed for that.
+
+![Nettleton O-L3](../outputs/nettleton/nettleton_O-L3-1-42.png)
+*Nettleton sheet for profile O-L3 (example; one sheet per profile in `outputs/nettleton/`).*
+
+![Nettleton summary](../outputs/nettleton/nettleton_summary_profiles.png)
+*Density per profile, simple versus complete Bouguer, ±1.96 SE.*
+
+![Nettleton windows](../outputs/nettleton/nettleton_windows_map.png)
+*3 km window densities (complete Bouguer) in map view.*
+
+### 4.4 Maps (`outputs/maps/`, grids in `outputs/grids/`)
+
+All maps use:
+
+* WGS84 coordinates, a Copernicus GLO-30 hillshade and the Red Sea coastline;
+* a scale bar and north arrow;
+* labelled contours and an explicit colour scale.
+
+**Gridding.** Stations are projected to UTM 36N, reduced to 200 m block medians, and interpolated with a damped biharmonic spline (Verde) on a 100 m grid. Nodes more than 2 km from a station are blanked.
+
+Block K-fold cross-validation (2 km blocks) gives the interpolation error between traverses:
+
+| Grid | rms error [mGal] |
+|---|---:|
+| Δg₁₀₀ | 1.83 |
+| ΔFA | 1.16 |
+| ΔSB(2.67) | 0.65 |
+| ΔCB(2.67) | 0.64 |
+
+These errors apply between the traverses, not at the stations. Read the grids as a guide to the regional pattern, and use the station values for quantitative work.
+
+| Map | Content |
+|---|---|
+| map01 | Station distribution, instruments, #0313 line labels, excluded points, location inset |
+| map02 | Station orthometric height |
+| map03 | GNSS-derived H minus DEM (height QC) |
+| map04 | Station 1σ uncertainty of ΔFA |
+| map05 | Observed gravity relative to base 100 |
+| map06 | Free-air anomaly |
+| map07 | Simple Bouguer anomaly, 2.67 g/cm³ |
+| map08 | Terrain correction, 2.67 g/cm³ (at the stations) |
+| map09 | **Complete Bouguer anomaly, 2.67 g/cm³ (main product)** |
+| map10 / map11 | Complete / simple Bouguer anomaly for 2.20, 2.40, 2.67 and 2.90 g/cm³ (common colour scale) |
+
+**What the complete Bouguer map shows.** A NW–SE belt of relative highs (+5 to +9 mGal) runs through the centre of the survey (34.82–34.90 °E). Lows of −10 to −14 mGal lie over the south-western massif, and a −5 to −7 mGal low lies near the coast in the north-east. The pattern is stable across 2.2–2.9 g/cm³; only the amplitude of the topography-correlated part changes. This is a description, not a geological interpretation.
+
+![Map 9](../outputs/maps/map09_complete_bouguer_2.67.png)
+*Map 9 – Complete Bouguer anomaly, ρ = 2.67 g/cm³, relative to base 100.*
+
+![Map 6](../outputs/maps/map06_free_air_anomaly.png)
+*Map 6 – Free-air anomaly relative to base 100.*
+
+![Map 10](../outputs/maps/map10_complete_bouguer_density_panel.png)
+*Map 10 – Complete Bouguer anomaly for four reduction densities.*
 
 ---
 
@@ -403,63 +485,48 @@ Each profile is ordered by station number, and its chainage is the cumulative in
 
 ```bash
 python -m pip install -r requirements.txt
-python scripts/run_processing.py --raw data/raw --out outputs
+python scripts/run_processing.py --raw data/raw --out outputs   # ~3 min (terrain stage ~2 min)
+python scripts/build_report_html.py
+python scripts/make_package.py --out dist                        # delivery folder + zip
 python -m pytest -q tests
-python scripts/terrain_correction.py --selftest
 ```
 
-The main script runs in about 15 s on a laptop. The tests check:
+On the first run the DEM and geoid windows are downloaded into `data/external/`. Later runs use that cache and need no network.
 
-* DMS parsing;
-* normal gravity at the equator and the pole;
-* the slab constant;
-* that the Longman module reproduces both on-board tide columns to < 1 µGal;
-* the CorrGrav identity.
+### 5.2 Outputs
 
-### 5.2 Machine-readable outputs (`outputs/tables/`)
-
-| File | Content |
+| Location | Content |
 |---|---|
-| 01, 01b | file inventory with SHA-256; zip members |
-| 02 | instrument header metadata |
-| 03 | CorrGrav = Raw + corrections verification |
-| 04 | tide checks (position, time shifts) |
-| 05_rows_qc | **all 1 519 rows**, original columns + recomputed tide, g_tidefix, accept/reject, reasons, occupation, GNSS match |
-| 06 | QC thresholds and threshold sensitivity |
-| 07 | all GNSS points (workbook, KML-only, reference), day, date |
-| 08 | date ↔ GNSS day-file mapping evidence |
-| 09 | base-mark heights per day; per-day datum adjustment |
-| 10–13 | control points, hotel–base ties, leave-one-out misclosures, segment rates, daily closures |
-| 14 | co-located instrument pairs; extrapolated-segment re-tie |
-| 15_occupations | all 1 116 occupations: values, sigma, role, GNSS match (distance, second candidate, ID consistency, source), drift mode, Δg₁₀₀ |
-| 16_field_stations_relative | field products: Δg₁₀₀ (raw and scaled), Δh, Δγ, FA term, ΔFA, ΔSB(ρ) sweep, sigmas, `product_ok` |
-| 17–19 | profile stations and summary, Nettleton sweeps and results, window estimates |
-| 20 | day-7 height adjustment check |
-| `summary.json` | key statistics, scale estimates, base references |
+| `outputs/deliverables/Wadi_Ghadir_Gravity_Results.xlsx` | **Final results workbook**: Final_Stations (985 rows, 57 columns incl. FA, SB and CB for 11 densities, coordinates in WGS84 and UTM 36N), Column_Dictionary, Profiles, Nettleton sheets, base control, ties, instrument scale, height and terrain checks, all occupations and all 1 519 QC rows |
+| `outputs/deliverables/*.csv / .geojson / .kml` | Final stations for plotting, GIS and Google Earth |
+| `outputs/maps/` | 11 publication maps (400 dpi) |
+| `outputs/nettleton/` | 22 profile sheets + 3 summary figures |
+| `outputs/figures/` | QC figures (tide, corrections, readings, QC, base 100, ties, instruments, GNSS) |
+| `outputs/grids/` | NetCDF and XYZ grids of every gridded map + cross-validation |
+| `outputs/tables/` | All processing tables (01–23) and `summary.json` |
+| `dist/Wadi_Ghadir_Gravity_Package.zip` | All of the above + report, scripts and input data, as one folder |
 
-### 5.3 Decisions and information needed for final complete Bouguer anomalies
+### 5.3 Information still needed for final absolute complete Bouguer anomalies
 
-1. **Absolute tie.** An absolute gravity value at base 100 or at the hotel station 0. Station 0 is the easier choice: tie it to the Egyptian National Gravity Standardization Network (ENGSN97) or an absolute station with a calibrated meter in a closed loop.
-2. **Instrument scale.** A calibration-line run (or the tie in item 1 made with both meters) to establish which meter's scale is correct. The current result rests on #0640, and the 1.19 % difference for #0313 is derived from the field data alone.
+1. **Absolute tie.** An absolute gravity value at base 100 or at the hotel station 0, for example a closed-loop tie to the Egyptian national gravity network. Without it all products remain relative to base 100.
+2. **Instrument scale.** A calibration-line run, or the absolute tie made with both meters, to establish which meter's scale is correct. The current result rests on #0640, and the 1.19 % difference for #0313 is derived from the field data alone.
 3. **GNSS metadata.**
-   * The MRSA reference coordinate: how it was obtained (PPP or CORS), the reference frame and epoch, and its ellipsoidal or orthometric height.
-   * The processing software and solution types (fixed or float).
-   * Antenna and pole heights per day.
-   * Whether the exported heights are ellipsoidal or orthometric, and with which geoid model (e.g. EGM2008 or a local Egyptian geoid).
-   * An explanation of the **day-7 offset** (+2.5 to +3.2 m) and the day-1 MRSA coordinate change.
-   * GNSS coordinates for the 20 #0640 stations without a GNSS point (106, 322–334, 351, 352, 382, 429, 550, 558).
-4. **Sensor height.** The CG-6 sensor height above the GNSS-measured point. InstrHeight is 0 in both exports.
-5. **Clock and time zone.** Confirmation that the CG-6 clocks ran on UTC. The tide reproduction strongly indicates this.
-6. **#0313 field notes.** Records for 18 Jan 15:25 to 19 Jan 07:03, 20 Jan 05:54, 22 Jan 08:07, 23 Jan 14:31–15:04 and 24 Jan 10:19–12:37, where the sensor output froze or was non-physical, and for the 16 Jan tare. The user tide position should be corrected in the meter before further use.
-7. **"Interacts" data.** If a third instrument was used, its export file. None was supplied.
-8. **DEM.** A DEM satisfying §4.2 (for example Copernicus GLO-30 or a local LiDAR/photogrammetric DEM) with its vertical datum documented, plus Red Sea bathymetry if the outer zones reach the coast.
-9. **Density.** Rock-sample densities for the main lithologies, or a repeated Nettleton/Parasnis analysis after terrain correction.
-
----
+   * Confirmation of the frame and epoch of the MRSA coordinate. Its ellipsoidal height is inferred here from the DEM comparison.
+   * Antenna and pole heights.
+   * An explanation of the day-7 offset and the day-1 MRSA coordinate change.
+   * Coordinates for the 20 unmatched #0640 stations.
+4. **Sensor height.** The CG-6 sensor height above each GNSS-measured point (InstrHeight is 0 in both exports; 0.2 m was assumed for the terrain computation).
+5. **#0313 field notes.** Records for the frozen and non-physical periods (§3.4) and for the 16 Jan tare. The tide user position should be corrected in the meter before further use.
+6. **Bathymetry.** Red Sea bathymetry (e.g. GEBCO) for the near-coast stations, and, optionally, a higher-resolution bare-earth DEM for the inner zone in narrow wadis.
+7. **Rock densities.** Outcrop sample densities of the main lithologies, to replace the working value of 2.67 g/cm³.
+8. **"Interacts" data.** The third instrument's export file, if that instrument was used.
 
 ### References
 
 * Hinze, W. J., et al. (2005). New standards for reducing gravity data: The North American gravity database. *Geophysics*, 70(4), J25–J32.
 * Longman, I. M. (1959). Formulas for computing the tidal accelerations due to the moon and the sun. *J. Geophys. Res.*, 64(12), 2351–2355.
 * Nettleton, L. L. (1939). Determination of density for reduction of gravimeter observations. *Geophysics*, 4(3), 176–183.
+* Copernicus DEM GLO-30, ESA/DLR/Airbus, https://doi.org/10.5270/ESA-c5d3d65.
+* Pavlis, N. K., et al. (2012). The development and evaluation of the Earth Gravitational Model 2008 (EGM2008). *J. Geophys. Res.*, 117, B04406.
+* Uieda, L., et al. Verde: Processing and gridding spatial data using Green's functions. *J. Open Source Softw.* 3(29), 957 (2018).
 * Uieda, L., et al. Harmonica: Forward modelling, inversion, and processing gravity and magnetic data. Fatiando a Terra project, https://www.fatiando.org/harmonica.

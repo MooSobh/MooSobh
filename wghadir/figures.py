@@ -371,6 +371,15 @@ def fig_nettleton(ctx, fdir):
 
 
 def make_all(ctx, fdir):
+    """QC figures into fdir; maps, grids and Nettleton sheets into sibling folders."""
+    from . import maps, nettleton_figs
+
     for f in (fig_map, fig_tide, fig_corrections, fig_timeseries, fig_qc, fig_base100, fig_ties, fig_instruments,
-              fig_gnss, fig_anomaly_maps, fig_nettleton):
+              fig_gnss):
         f(ctx, fdir)
+    root = os.path.dirname(os.path.abspath(fdir))
+    print("  maps ...", flush=True)
+    cv = maps.make_all(ctx, os.path.join(root, "maps"), os.path.join(root, "grids"))
+    print("  Nettleton figures ...", flush=True)
+    nettleton_figs.make_all(ctx, os.path.join(root, "nettleton"))
+    return cv

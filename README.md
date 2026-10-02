@@ -12,36 +12,27 @@ point files.
 
 | Product | Status |
 |---|---|
-| Δg relative to base 100, per occupation, with QC and drift control | ready (985 field occupations) |
-| Base-relative free-air and simple Bouguer quantities (density sweep 2.0–3.0 g/cm³) | **provisional**: height datum undocumented, no terrain correction |
-| Absolute gravity, absolute free-air / complete Bouguer anomalies | **not possible** with the supplied data (no absolute tie, no DEM) |
-| Bouguer density from Nettleton profiles | **not determined**: profiles disagree (see report §4.3) |
+| Δg relative to base 100, per station, with QC and drift control | ready (985 field stations) |
+| Free-air, simple Bouguer and **complete (terrain-corrected) Bouguer** anomalies relative to base 100, ρ = 2.0–3.0 g/cm³ | ready, relative to base 100 (EGM2008 orthometric heights; Copernicus GLO-30 terrain correction) |
+| Maps (11), Nettleton sheets (22 profiles), grids (NetCDF/XYZ), Excel workbook, GeoJSON, KML | ready |
+| Absolute anomalies | **not possible** without an absolute gravity tie |
+| Bouguer density | working value 2.67 g/cm³; robust Nettleton profiles 2.71–2.96 g/cm³ (report §4.3) |
 
 ## Run
 
 ```bash
 python -m pip install -r requirements.txt
-python scripts/run_processing.py --raw data/raw --out outputs   # ~15 s
-python -m pytest -q tests                                       # regression tests
-python scripts/terrain_correction.py --selftest                 # Harmonica prism check (optional)
-```
-
-`run_processing.py` re-creates every table and figure from the five files in `data/raw/`
-(the two CG-6 `.dat` exports, `GPS_All_Days.xlsx`, `results.zip`, and the processing brief).
-Python ≥ 3.10.
-
-Once a DEM is available (same vertical datum as the station heights, ≥ 22 km beyond the
-survey), run
-
-```bash
-python scripts/terrain_correction.py --dem dem.nc --density 2.67 \
-    --stations outputs/tables/16_field_stations_relative.csv --out outputs/tables/21_terrain_corrected.csv
+python scripts/run_processing.py --raw data/raw --out outputs   # ~3 min; first run downloads DEM/geoid windows
+python scripts/build_report_html.py                             # report/REPORT.html
+python scripts/make_package.py --out dist                       # dist/Wadi_Ghadir_Gravity_Package(.zip)
+python -m pytest -q tests
 ```
 
 ## Layout
 
 ```
 data/raw/               supplied files, unchanged (SHA-256 in outputs/tables/01_file_inventory.csv)
+data/external/          Copernicus GLO-30 and EGM2008 windows used (with provenance)
 wghadir/cg6.py          CG-6 export reader, occupation grouping
 wghadir/tide.py         Longman (1959) tide, reproduces the CG-6 TideCorr to 0.2 µGal rms
 wghadir/qc.py           row-level QC thresholds and flags
@@ -49,8 +40,15 @@ wghadir/gnss.py         DMS workbooks and KML readers
 wghadir/pipeline.py     processing stages (inventory → QC → GNSS → base control → reductions → Nettleton)
 wghadir/reduce.py       normal gravity, free-air, Bouguer slab
 wghadir/nettleton.py    density sweep, regression density, block bootstrap
-wghadir/figures.py      report figures
+wghadir/geodata.py      Copernicus GLO-30 DEM and EGM2008 geoid (download + cache), sampling, hillshade
+wghadir/terrain.py      DEM prism topographic effect (Harmonica), inner/outer zones, Earth curvature
+wghadir/maps.py         publication maps and grids (Verde spline, UTM 36N)
+wghadir/nettleton_figs.py  per-profile Nettleton sheets and summaries
+wghadir/export.py       Excel workbook, GeoJSON, KML
+wghadir/figures.py      QC figures
 scripts/run_processing.py      full chain
-scripts/terrain_correction.py  DEM-based topographic correction (Harmonica), not run: no DEM supplied
+scripts/build_report_html.py   self-contained HTML report
+scripts/make_package.py        delivery folder and zip
+scripts/terrain_correction.py  stand-alone terrain correction for another DEM (+ slab self-test)
 tests/                  regression tests
 ```
