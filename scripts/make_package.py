@@ -64,6 +64,8 @@ def copy(src_glob, dst):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default="dist")
+    ap.add_argument("--split-mb", type=float, default=40.0,
+                    help="also write numbered zip parts below this size (0 = off)")
     a = ap.parse_args()
     pkg = os.path.join(ROOT, a.out, NAME)
     if os.path.exists(pkg):
@@ -103,6 +105,37 @@ def main():
     zpath = shutil.make_archive(os.path.join(ROOT, a.out, NAME), "zip", os.path.join(ROOT, a.out), NAME)
     print(counts)
     print(f"package: {pkg}\nzip: {zpath} ({os.path.getsize(zpath) / 1e6:.1f} MB)")
+    if a.split_mb:
+        split_zips(pkg, os.path.join(ROOT, a.out), a.split_mb * 1e6)
+
+
+def split_zips(pkg, out_dir, limit):
+    """Numbered zip parts (each < limit bytes) that unpack into the same folder tree."""
+    import zipfile
+
+    files = []
+    for dp, _, fns in os.walk(pkg):
+        for fn in sorted(fns):
+            full = os.path.join(dp, fn)
+            files.append((os.path.relpath(full, os.path.dirname(pkg)), full, os.path.getsize(full)))
+    files.sort(key=lambda t: t[0])
+    parts, cur, size = [], [], 0
+    for rel, full, sz in files:
+        if cur and size + sz > limit:
+            parts.append(cur)
+            cur, size = [], 0
+        cur.append((rel, full))
+        size += sz
+    parts.append(cur)
+    for old in glob.glob(os.path.join(out_dir, NAME + "_part*.zip")):
+        os.remove(old)
+    for k, part in enumerate(parts, 1):
+        zp = os.path.join(out_dir, f"{NAME}_part{k}of{len(parts)}.zip")
+        with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED) as z:
+            for rel, full in part:
+                z.write(full, rel)
+        tops = sorted({r.split(os.sep)[1] for r, _ in part if r.count(os.sep) >= 1})
+        print(f"{os.path.basename(zp)}: {os.path.getsize(zp) / 1e6:.1f} MB  [{', '.join(tops)}]")
 
 
 if __name__ == "__main__":
