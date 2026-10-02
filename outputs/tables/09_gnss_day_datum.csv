@@ -1,0 +1,10 @@
+gnss_day,dh_hotel0_m,dh_base100_m,day_height_shift_m,day_shift_sigma_m,rule,mrsa_h,mrsa_E_local,mrsa_N_local
+1,0.104,0.115,0,0,no adjustment,48.9861,0,0
+2,-0.024,0.022,0,0,no adjustment,48.861,2.35,-0.761
+3,0.026,-0.003,0,0,no adjustment,48.883,2.35,-0.761
+4,0,-0.202,0,0,no adjustment,48.868,2.35,-0.761
+5,-0.018,-0.016,0,0,no adjustment,48.868,2.35,-0.761
+6,0.055,-0.267,0,0,no adjustment,48.868,2.35,-0.761
+7,2.509,3.155,2.832,0.323,both base marks offset > 0.5 m with equal sign: heights reduced by mean offset,48.868,2.35,-0.761
+8,-0.002,0,0,0,no adjustment,48.868,2.35,-0.761
+9,-0.011,0.0410734,0,0,no adjustment,48.868,2.35,-0.761

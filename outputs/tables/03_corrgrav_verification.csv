@@ -1,0 +1,3 @@
+instrument,rows_checked,rows_with_overflow,closure_rms_mgal,closure_max_abs_mgal,equation,mean_tide,mean_temp,mean_tilt,mean_drift
+CG6-0313,724,1,6.73081e-05,0.0002,CorrGrav = RawGrav + TideCorr + TiltCorr + TempCorr + DriftCorr,-0.0212685,0.270644,0.0007,-739.63
+CG6-0640,795,2,6.52041e-05,0.0002,CorrGrav = RawGrav + TideCorr + TiltCorr + TempCorr + DriftCorr,-0.00424164,0.492939,0.001,0

@@ -1,0 +1,25 @@
+metric,threshold,instrument,rows_rejected,rows_valid_before,occupations_lost
+StdDev [mGal],0.03,CG6-0313,139,696,92
+StdDev [mGal],0.03,CG6-0640,137,793,117
+StdDev [mGal],0.04,CG6-0313,62,696,36
+StdDev [mGal],0.04,CG6-0640,81,793,71
+StdDev [mGal],0.05,CG6-0313,33,696,16
+StdDev [mGal],0.05,CG6-0640,37,793,31
+StdDev [mGal],0.06,CG6-0313,14,696,4
+StdDev [mGal],0.06,CG6-0640,19,793,15
+StdDev [mGal],0.08,CG6-0313,0,696,0
+StdDev [mGal],0.08,CG6-0640,4,793,4
+StdDev [mGal],0.1,CG6-0313,0,696,0
+StdDev [mGal],0.1,CG6-0640,1,793,1
+"max(|X|,|Y|) [arcsec]",10,CG6-0313,133,696,85
+"max(|X|,|Y|) [arcsec]",10,CG6-0640,255,793,186
+"max(|X|,|Y|) [arcsec]",15,CG6-0313,15,696,5
+"max(|X|,|Y|) [arcsec]",15,CG6-0640,80,793,46
+"max(|X|,|Y|) [arcsec]",20,CG6-0313,6,696,1
+"max(|X|,|Y|) [arcsec]",20,CG6-0640,19,793,12
+"max(|X|,|Y|) [arcsec]",25,CG6-0313,1,696,0
+"max(|X|,|Y|) [arcsec]",25,CG6-0640,6,793,6
+"max(|X|,|Y|) [arcsec]",30,CG6-0313,1,696,0
+"max(|X|,|Y|) [arcsec]",30,CG6-0640,3,793,3
+"max(|X|,|Y|) [arcsec]",40,CG6-0313,0,696,0
+"max(|X|,|Y|) [arcsec]",40,CG6-0640,2,793,2

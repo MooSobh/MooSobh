@@ -1,0 +1,19 @@
+gnss_day,mark,point_id,source,h_gnss,h_median_all_days,dh_m,horiz_offset_m
+1,hotel_0,Base0,results.zip/day1.xlsx,36.616,36.512,0.104,2.47113
+2,hotel_0,Base1,results.zip/day2.xlsx,36.488,36.512,-0.024,0.00957513
+3,hotel_0,Base0,results.zip/day3.xlsx,36.538,36.512,0.026,0.0154364
+4,hotel_0,Base0,results.zip/day4.xlsx,36.512,36.512,0,0.0086733
+5,hotel_0,Base0,results.zip/day5.xlsx,36.494,36.512,-0.018,0.00311202
+6,hotel_0,BASE 21-01-2026,results.zip/day6.xlsx,36.567,36.512,0.055,0.0422348
+7,hotel_0,Base0,results.zip/day7.xlsx,39.021,36.512,2.509,0.586827
+8,hotel_0,Base 0,results.zip/day8.xlsx,36.51,36.512,-0.002,0.0123165
+9,hotel_0,BASE24-01-2026,results.zip/day9.xlsx,36.501,36.512,-0.011,0.0816468
+9,base_100,Base 100,results.zip/day9.kml,111.811,111.77,0.0410734,0.121587
+1,base_100,B100 16-01-2026,results.zip/day1.xlsx,111.885,111.77,0.115,2.4517
+2,base_100,Base100,results.zip/day2.xlsx,111.792,111.77,0.022,0.0165448
+3,base_100,Base100,results.zip/day3.xlsx,111.767,111.77,-0.003,0.029652
+4,base_100,Base100,results.zip/day4.xlsx,111.568,111.77,-0.202,0.0846891
+5,base_100,Base100,results.zip/day5.xlsx,111.754,111.77,-0.016,0.0276983
+6,base_100,Base 100,results.zip/day6.xlsx,111.503,111.77,-0.267,0.281213
+7,base_100,Base 100,results.zip/day7.xlsx,114.925,111.77,3.155,2.16375
+8,base_100,Base100,results.zip/day8.xlsx,111.77,111.77,0,0.0236739

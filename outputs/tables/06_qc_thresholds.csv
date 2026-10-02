@@ -1,0 +1,2 @@
+stddev_reject_mgal,stddev_warn_mgal,tilt_reject_arcsec,tilt_warn_arcsec,repeat_outlier_mgal,repeat_range_warn_mgal,gps_spread_warn_m,gross_range_mgal
+0.08,0.05,30,20,0.05,0.05,50,500
