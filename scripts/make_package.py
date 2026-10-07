@@ -22,10 +22,10 @@ Prepared by Dr. Mohamed Sobh, LIAG.
 | Folder | Content |
 |---|---|
 | `01_Report/` | Technical report: `REPORT.html` (self-contained, open in any browser) and `REPORT.md` |
-| `02_Maps/` | Publication maps (400 dpi PNG): stations, elevation, height QC, uncertainty, observed gravity, free-air, simple and complete Bouguer, terrain correction, density panels |
+| `02_Maps/` | Publication maps (400 dpi PNG): stations, elevation, height QC, uncertainty, observed gravity, free-air, simple and complete Bouguer, terrain correction, density panels; `Magnetics/`: total field (points and grid), anomaly, reduced-to-pole |
 | `03_QC_Figures/` | Processing / QC figures: tide check, correction terms, readings, StdDev/tilt, base-100 drift, ties, instrument comparison, GNSS checks |
 | `04_Nettleton/` | One density sheet per profile (topography, anomaly for ρ = 2.0–3.0, Nettleton criterion) and summary figures |
-| `05_Results_Data/` | **Final results**: `Wadi_Ghadir_Gravity_Results.xlsx` (all sheets, column dictionary), `Wadi_Ghadir_Final_Stations.csv`, GeoJSON (GIS) and KML (Google Earth) |
+| `05_Results_Data/` | **Final results**: `Wadi_Ghadir_Gravity_Results.xlsx` (all sheets, column dictionary), `Wadi_Ghadir_Magnetic_Results.xlsx`, `Wadi_Ghadir_Final_Stations.csv`, GeoJSON (GIS) and KML (Google Earth) |
 | `06_Grids/` | Gridded maps as NetCDF and XYZ CSV (lon, lat, UTM 36N, value) + gridding cross-validation |
 | `07_Tables_CSV/` | Every processing table (QC rows, occupations, base control, ties, GNSS, Nettleton, …) and `summary.json` |
 | `08_Scripts/` | Complete Python processing chain, tests and requirements |
@@ -47,6 +47,7 @@ sections 1 and 5 before interpreting the values.
 cd 08_Scripts
 python -m pip install -r requirements.txt
 python scripts/run_processing.py --raw ../09_Input_Data/raw --external ../09_Input_Data/external --out outputs
+python scripts/run_magnetics.py --mag ../09_Input_Data/raw/magnetics/All_Data_Corrected_Total_Intensity.xlsx --external ../09_Input_Data/external --out outputs
 ```
 """
 
@@ -78,7 +79,7 @@ def main():
     os.makedirs(rep)
     shutil.copy2(os.path.join(ROOT, "report", "REPORT.html"), rep)
     md = open(os.path.join(ROOT, "report", "REPORT.md"), encoding="utf-8").read()
-    for old, new in (("../outputs/maps/", "../02_Maps/"), ("../outputs/figures/", "../03_QC_Figures/"),
+    for old, new in (("../outputs/magnetics/", "../02_Maps/Magnetics/"), ("../outputs/maps/", "../02_Maps/"), ("../outputs/figures/", "../03_QC_Figures/"),
                      ("../outputs/nettleton/", "../04_Nettleton/")):
         md = md.replace(old, new)
     md = re.sub(r"`outputs/tables/", "`07_Tables_CSV/", md)
@@ -88,6 +89,7 @@ def main():
         "02_Maps": copy("outputs/maps/*.png", os.path.join(pkg, "02_Maps")),
         "03_QC_Figures": copy("outputs/figures/*.png", os.path.join(pkg, "03_QC_Figures")),
         "04_Nettleton": copy("outputs/nettleton/*.png", os.path.join(pkg, "04_Nettleton")),
+        "02_Maps/Magnetics": copy("outputs/magnetics/*.png", os.path.join(pkg, "02_Maps", "Magnetics")),
         "05_Results_Data": copy("outputs/deliverables/*", os.path.join(pkg, "05_Results_Data")),
         "06_Grids": copy("outputs/grids/*", os.path.join(pkg, "06_Grids")),
         "07_Tables_CSV": copy("outputs/tables/*.csv", os.path.join(pkg, "07_Tables_CSV")),
@@ -112,12 +114,15 @@ def main():
 def split_zips(pkg, out_dir, limit):
     """Numbered zip parts (each < limit bytes) that unpack into the same folder tree."""
     import zipfile
+    import zlib
 
     files = []
     for dp, _, fns in os.walk(pkg):
         for fn in sorted(fns):
             full = os.path.join(dp, fn)
-            files.append((os.path.relpath(full, os.path.dirname(pkg)), full, os.path.getsize(full)))
+            with open(full, "rb") as fh:
+                csize = len(zlib.compress(fh.read(), 6))  # parts are limited by their compressed size
+            files.append((os.path.relpath(full, os.path.dirname(pkg)), full, csize))
     files.sort(key=lambda t: t[0])
     parts, cur, size = [], [], 0
     for rel, full, sz in files:

@@ -1,0 +1,27 @@
+{
+  "Source file": "All_Data_Corrected_Total_Intensity.xlsx",
+  "Rows": 12163,
+  "Survey readings": 12161,
+  "Accepted": 12006,
+  "Rejected spikes": 155,
+  "Non-data rows": 2,
+  "Survey days (from time stamps)": 10,
+  "IGRF model / date": "IGRF-14, 2026-01-20 (assumed: no dates in the file)",
+  "Field inclination / declination (median)": "36.74\u00b0 / 4.22\u00b0",
+  "Despike": "Hampel, window 11, k = 6.0, floor 30.0 nT",
+  "Gridding": "100 m block median, spline, 50 m grid, mask 2.0 km",
+  "Cross-validation rms (TMI / TMA)": "169.1 / 169.1 nT",
+  "inc": 36.74446871748644,
+  "dec": 4.221413039446999,
+  "crossover_pairs": 3,
+  "crossover_median_abs_nT": 4.9099999999962165,
+  "tma_percentiles": [
+    -596.8959182581318,
+    -94.41525054763406,
+    1439.1855694827552
+  ],
+  "rtp_range": [
+    -541.2686883116206,
+    2871.7470793503044
+  ]
+}

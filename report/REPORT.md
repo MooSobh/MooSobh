@@ -1,6 +1,6 @@
 # Wadi Ghadir gravity survey, Eastern Desert, Egypt (16–24 January 2026)
 
-## Processing, quality control, terrain-corrected base-relative anomalies and density analysis of the CG-6 data
+## Gravity (CG-6) processing, terrain-corrected anomalies and density analysis; ground magnetic maps and RTP
 
 **Prepared by:** Dr. Mohamed Sobh, LIAG
 **Date:** 2 October 2026
@@ -479,13 +479,83 @@ These errors apply between the traverses, not at the stations. Read the grids as
 
 ---
 
-## 5  Code, outputs and missing metadata
+## 5  Ground magnetic data (`scripts/run_magnetics.py`, `outputs/magnetics/`)
 
-### 5.1 Code
+### 5.1 Data and processing
+
+**Source.** `All_Data_Corrected_Total_Intensity.xlsx` holds 12 163 rows with these columns:
+
+* lat, long, UTM 36N x/y, elevation E;
+* raw reading;
+* time (hhmmss);
+* "Corrected data (Total Intensity)", the diurnally corrected total field as supplied.
+
+The diurnal correction applied by the field team (corrected minus raw) ranges from 0 to −170 nT. I did not modify it.
+
+**Survey pattern.** Readings are taken every 2 s, about 2.6 m apart (continuous walking mode), along largely the same traverses as the gravity survey. The file carries no dates. The time stamps split the data into **10 survey days**, a new day starting wherever the time steps back by more than 30 min (`31_mag_day_summary.csv`).
+
+| Step | Rule | Result |
+|---|---|---|
+| Non-data rows | rows with no time or position (`/line 00000`) | 2 removed |
+| Coordinates | UTM 36N recomputed from lat/long and compared with the file's x/y | agreement ≤ 1 cm; 48 rows without x/y filled from lat/long |
+| Despike | Hampel filter within each day: window 11 readings (~28 m), reject if deviation > max(30 nT, 6 × 1.4826 × MAD) | 155 readings rejected (1.3 %); **12 006 accepted** |
+| Crossover check | accepted readings < 5 m apart on different days | only 3 pairs (days 1/10), median difference −4.9 nT. The days barely overlap, so day-to-day levelling cannot be tested further |
+| Main field | IGRF-14 (ppigrf) at each reading, **20 Jan 2026 assumed** (no dates in the file) | F ≈ 41 972 nT, I = 36.74°, D = 4.22° at the survey centre |
+| Anomaly | TMA = corrected TMI − IGRF | 1st/50th/99th percentile: −597 / −94 / +1 439 nT |
+
+**Sensitivity to the assumed date.** Between Jan 2025 and Jul 2026 the IGRF total field changes by +41 nT, about 27 nT per year (`33_mag_igrf_date_sensitivity.csv`). The field direction changes by less than 0.06°. An error in the date therefore shifts the anomaly by a constant and leaves its shape and the RTP unchanged.
+
+### 5.2 Gridding and reduction to the pole
+
+**Gridding.** The gravity gridding scheme is used with a finer grid suited to the magnetic wavelengths:
+
+* UTM 36N coordinates;
+* 100 m block median, linear trend and damped biharmonic spline (Verde);
+* 50 m grid, blanked more than 2 km from the data.
+
+Block K-fold cross-validation gives an rms of 169 nT. That is large because strong, short-wavelength sources are only sampled along the traverses. The grids show the pattern between traverses, but quantitative work should use the readings.
+
+**RTP.** I computed the reduction to the pole by FFT (Harmonica `reduction_to_pole`) with I = 36.74° and D = 4.22°, assuming induced magnetisation along the present field. Before the FFT, the anomaly grid was tapered (sin²) to its median over 3 km beyond the data mask and padded by 50 % on each side, then cropped and re-masked. At this inclination the RTP operator is stable.
+
+Remanent magnetisation, which is common in basement dykes, is not accounted for. RTP anomalies over remanent bodies may be displaced or distorted.
+
+**Maps** (400 dpi, same style and palette as the gravity maps, histogram-equalised colour classes):
+
+| Map | Content |
+|---|---|
+| mag01 | Corrected total field at the 12 006 accepted readings (points only), with rejected spikes |
+| mag02 | Total-field anomaly (TMI − IGRF) at the readings |
+| mag03 | Total field, gridded |
+| mag04 | Total-field anomaly, gridded |
+| mag05 | **Reduced-to-pole anomaly** |
+
+The strongest feature is a ~2 km wide RTP high in the south-west, peaking at +2 870 nT (34.749 °E, 24.723 °N; 99.5th percentile of the grid +1 610 nT). It is flanked by lows to the north and east. A second belt of RTP highs (+400 to +800 nT) lies at 34.85–34.90 °E, 24.78–24.82 °N. The area around base 100 is a broad low, reaching the grid minimum of −540 nT just west of the base.
+
+![Mag 1](../outputs/magnetics/mag01_TMI_points.png)
+*Mag 1 – Corrected total magnetic intensity at the survey readings.*
+
+![Mag 3](../outputs/magnetics/mag03_TMI_grid.png)
+*Mag 3 – Total magnetic intensity, gridded.*
+
+![Mag 5](../outputs/magnetics/mag05_RTP_grid.png)
+*Mag 5 – Reduced-to-pole anomaly.*
+
+**Outputs.**
+
+* `outputs/deliverables/Wadi_Ghadir_Magnetic_Results.xlsx`: README, all readings with QC flags, IGRF and anomaly, day summary, crossovers, IGRF date sensitivity.
+* `outputs/tables/30`–`33_mag_*.csv`.
+* Grids `outputs/grids/mag_tmi|tma|rtp.nc` and `_xyz.csv`.
+
+---
+
+## 6  Code, outputs and missing metadata
+
+### 6.1 Code
 
 ```bash
 python -m pip install -r requirements.txt
 python scripts/run_processing.py --raw data/raw --out outputs   # ~3 min (terrain stage ~2 min)
+python scripts/run_magnetics.py                                  # magnetics (~1 min, needs the gravity run)
 python scripts/build_report_html.py
 python scripts/make_package.py --out dist                        # delivery folder + zip
 python -m pytest -q tests
@@ -493,7 +563,7 @@ python -m pytest -q tests
 
 On the first run the DEM and geoid windows are downloaded into `data/external/`. Later runs use that cache and need no network.
 
-### 5.2 Outputs
+### 6.2 Outputs
 
 | Location | Content |
 |---|---|
@@ -506,7 +576,7 @@ On the first run the DEM and geoid windows are downloaded into `data/external/`.
 | `outputs/tables/` | All processing tables (01–23) and `summary.json` |
 | `dist/Wadi_Ghadir_Gravity_Package.zip` | All of the above + report, scripts and input data, as one folder |
 
-### 5.3 Information still needed for final absolute complete Bouguer anomalies
+### 6.3 Information still needed for final absolute complete Bouguer anomalies
 
 1. **Absolute tie.** An absolute gravity value at base 100 or at the hotel station 0, for example a closed-loop tie to the Egyptian national gravity network. Without it all products remain relative to base 100.
 2. **Instrument scale.** A calibration-line run, or the absolute tie made with both meters, to establish which meter's scale is correct. The current result rests on #0640, and the 1.19 % difference for #0313 is derived from the field data alone.
@@ -519,7 +589,8 @@ On the first run the DEM and geoid windows are downloaded into `data/external/`.
 5. **#0313 field notes.** Records for the frozen and non-physical periods (§3.4) and for the 16 Jan tare. The tide user position should be corrected in the meter before further use.
 6. **Bathymetry.** Red Sea bathymetry (e.g. GEBCO) for the near-coast stations, and, optionally, a higher-resolution bare-earth DEM for the inner zone in narrow wadis.
 7. **Rock densities.** Outcrop sample densities of the main lithologies, to replace the working value of 2.67 g/cm³.
-8. **"Interacts" data.** The third instrument's export file, if that instrument was used.
+8. **Magnetic survey dates and base station.** The actual dates of the 10 magnetic survey days, for the IGRF, and the base-station record behind the diurnal correction.
+9. **"Interacts" data.** The third instrument's export file, if that instrument was used.
 
 ### References
 
