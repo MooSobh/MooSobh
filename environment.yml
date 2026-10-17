@@ -4,7 +4,8 @@
 #   conda env create -f environment.yml        (or: mamba env create -f environment.yml)
 #   conda activate wghadir
 #   python -m pytest -q                        # quick check of the installation
-#   jupyter lab notebooks/                     # step-by-step notebooks
+#   jupyter lab notebooks/                     # step-by-step notebooks (01-03)
+#   open web/Wadi_Ghadir_Gravity_Lab.html      # interactive lab in any browser
 #   python scripts/run_all.py                  # or the complete chains from the command line
 #
 # Tested with Python 3.11, numpy 2.4, pandas 3.0, verde 1.9, harmonica 0.7, xrft 1.0, ppigrf 2.1.
@@ -23,7 +24,14 @@ dependencies:
   - pyproj>=3.5           # UTM 36N for gridding and the Excel coordinates
   - xarray>=2023.1
   - verde>=1.8            # block-median + biharmonic-spline gridding, cross-validation
-  - harmonica>=0.7        # prism terrain correction, FFT reduction to the pole
+  - harmonica>=0.7        # prism terrain correction, equivalent sources, FFT filters
+  - boule>=0.4            # reference ellipsoids, normal gravity at height (notebook 03)
+  - choclo>=0.2           # prism kernels used by Harmonica (notebook 03 check)
+  - pygmt>=0.12           # PyGMT maps (installs GMT 6)
+  - networkx              # needed by the vendored SGTool filter engine
+  - fortran-compiler      # builds pygtide (ETERNA) below
+  - meson
+  - ninja
   - xrft>=1.0             # grid padding for the FFT
   - markdown>=3.4         # HTML report build
   - jupyterlab
@@ -33,4 +41,5 @@ dependencies:
   - pip
   - pip:
       - ppigrf>=2.1       # IGRF-14 main field (magnetic anomaly)
+      - pygtide>=0.9      # ETERNA PREDICT earth tides (notebook 03; optional, falls back to Longman)
       - -e .              # installs the wghadir package itself (pyproject.toml)

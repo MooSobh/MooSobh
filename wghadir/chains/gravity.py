@@ -70,7 +70,7 @@ class GravityChain:
 
     def _save(self, df, name):
         """Write one processing table to <out_dir>/tables/<name>."""
-        df.to_csv(os.path.join(self.table_dir, name), index=False, float_format="%.6g")
+        df.to_csv(os.path.join(self.table_dir, name), index=False, float_format="%.10g")
 
     # ------------------------------------------------------------------ steps
     def step01_inventory(self):

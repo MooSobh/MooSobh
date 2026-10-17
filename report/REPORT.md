@@ -556,12 +556,14 @@ The processing is a Python package (`wghadir`) with two chain classes whose numb
 
 ```bash
 conda env create -f environment.yml && conda activate wghadir   # or: python -m pip install -r requirements.txt
-python -m pytest -q                       # installation check (10 tests)
+python -m pytest -q                       # installation check (13 tests)
 python scripts/run_all.py                 # gravity steps 1-14, then magnetics steps 1-8 (~5 min)
 jupyter lab notebooks/                    # the same chains step by step, with tables and figures
 python scripts/build_report_html.py       # report/REPORT.html
 python scripts/make_package.py            # delivery folder and zip parts in dist/
 ```
+
+Two further tools build on the same chain. `notebooks/03_Gravity_OpenSource_Workflow.ipynb` repeats the gravity processing with open-source libraries: ETERNA tides (pygtide), the Boule gravity disturbance, Harmonica/Choclo prisms and equivalent sources, Verde, SGTool filters and PyGMT maps. With these choices the complete Bouguer values differ from the delivered ones by +0.12 ± 0.08 mGal, almost entirely the gravity disturbance replacing the free-air anomaly (EGM2008 undulation varies by 1.2 m across the area). `web/Wadi_Ghadir_Gravity_Lab.html` is an interactive browser lab that runs the chain in JavaScript on the raw CG-6 files; with the default parameters it reproduces the delivered complete Bouguer anomalies to better than 1 µGal (median 0.08 µGal).
 
 | Gravity step (`GravityChain`) | Module | Report |
 |---|---|---|

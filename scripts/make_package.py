@@ -111,7 +111,7 @@ def main():
     }
     shutil.copy2(os.path.join(ROOT, "outputs", "summary.json"), os.path.join(pkg, "07_Tables_CSV"))
     code = os.path.join(pkg, "08_Scripts")
-    for d in ("wghadir", "scripts", "tests", "notebooks"):
+    for d in ("wghadir", "scripts", "tests", "notebooks", "web", "third_party"):
         shutil.copytree(os.path.join(ROOT, d), os.path.join(code, d), ignore=IGNORE)
     for f in CODE_FILES:
         shutil.copy2(os.path.join(ROOT, f), code)
@@ -131,7 +131,7 @@ def chains_package(out_dir):
     if os.path.exists(pkg):
         shutil.rmtree(pkg)
     os.makedirs(pkg)
-    for d in ("wghadir", "scripts", "tests", "notebooks"):
+    for d in ("wghadir", "scripts", "tests", "notebooks", "web", "third_party"):
         shutil.copytree(os.path.join(ROOT, d), os.path.join(pkg, d), ignore=IGNORE)
     for f in CODE_FILES:
         shutil.copy2(os.path.join(ROOT, f), pkg)

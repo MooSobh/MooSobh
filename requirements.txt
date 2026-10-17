@@ -13,6 +13,11 @@ verde>=1.8           # biharmonic-spline gridding and cross-validation
 harmonica>=0.7       # prism terrain correction, FFT reduction to the pole
 xrft>=1.0            # padding for the FFT reduction to the pole
 ppigrf>=2.1          # IGRF-14 main field for the magnetic anomaly
+boule>=0.4           # normal gravity at height (notebook 03)
+choclo>=0.2          # prism kernels (notebook 03)
+pygmt>=0.12          # maps; needs the GMT 6 library installed (conda: gmt; apt: gmt libgmt-dev)
+networkx             # vendored SGTool filter engine
+pygtide>=0.9         # ETERNA earth tides; needs a Fortran compiler to build (optional)
 markdown>=3.4        # report HTML build
 jupyterlab
 ipykernel

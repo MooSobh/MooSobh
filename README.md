@@ -20,7 +20,7 @@ With conda or mamba (recommended: rasterio and pyproj come with their binary lib
 ```bash
 conda env create -f environment.yml
 conda activate wghadir
-python -m pytest -q              # 10 tests, about 5 s
+python -m pytest -q              # 13 tests, about 10 s
 ```
 
 With pip, using an existing Python ≥ 3.10:
@@ -40,10 +40,19 @@ jupyter lab notebooks/
 
 * `notebooks/01_Gravity_Processing.ipynb`: gravity, steps 1–14, from loading the CG-6 files to the maps.
 * `notebooks/02_Magnetic_Processing.ipynb`: magnetics, steps 1–8, from loading the workbook to the RTP map.
+* `notebooks/03_Gravity_OpenSource_Workflow.ipynb`: gravity from readings to maps with the open-source stack:
+  pygtide/ETERNA (tide), Boule (normal gravity, gravity disturbance), Harmonica and Choclo (Bouguer and terrain
+  prisms, equivalent sources, filters), Verde (gridding), SGTool (derivatives, tilt angle) and PyGMT (maps).
+  Results go to `outputs/open_source/`.
 
 Each step has a **✏️ PARAMETERS** cell (thresholds, densities, grid spacing and so on, all editable), a **▶ PROCESSING**
 cell that calls the `wghadir` functions directly, and a **📊 RESULT** cell with tables and plots made in the notebook.
 After a change, re-run that step and the steps below it. The default parameters reproduce the delivered results.
+
+**Interactive lab in the browser:** open `web/Wadi_Ghadir_Gravity_Lab.html` in any browser (no installation).
+It runs the gravity chain in JavaScript on the raw CG-6 files, with every parameter adjustable, maps, filters
+and exports, and accepts your own CG-6 exports and station table (chapter 2.1). Rebuild it after changing the
+Python results with `python scripts/build_gravity_lab.py`; its sources are in `web/src/`.
 
 **From the command line:**
 
@@ -51,6 +60,7 @@ After a change, re-run that step and the steps below it. The default parameters 
 python scripts/run_all.py                # gravity, then magnetics (~5 min incl. 400 dpi maps)
 python scripts/run_gravity.py            # gravity only   (--no-figures: ~1 min)
 python scripts/run_magnetics.py          # magnetics only (~1 min)
+python scripts/build_gravity_lab.py      # rebuild web/Wadi_Ghadir_Gravity_Lab.html
 ```
 
 **From Python:**
@@ -96,7 +106,9 @@ All tunable values are in `wghadir/gravity/settings.py` and `wghadir/magnetic/se
 
 ```
 environment.yml, requirements.txt, pyproject.toml   installation
-notebooks/                 01_Gravity_Processing.ipynb, 02_Magnetic_Processing.ipynb
+notebooks/                 01_Gravity_Processing.ipynb, 02_Magnetic_Processing.ipynb, 03_Gravity_OpenSource_Workflow.ipynb
+web/                       Wadi_Ghadir_Gravity_Lab.html (interactive lab) and its sources in web/src/
+third_party/sgtool/        SGTool filter engine (MIT, vendored unchanged; see its README)
 scripts/                   run_all.py, run_gravity.py, run_magnetics.py, build_report_html.py, make_package.py
 wghadir/
   chains/gravity.py        GravityChain   – the gravity chain, steps 1-14

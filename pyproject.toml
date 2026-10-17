@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 notebooks = ["jupyterlab", "ipykernel", "nbconvert"]
+opensource = ["boule>=0.4", "choclo>=0.2", "pygmt>=0.12", "networkx", "pygtide>=0.9"]
 report = ["markdown>=3.4"]
 test = ["pytest>=7"]
 

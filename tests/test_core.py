@@ -78,3 +78,46 @@ def test_magnetic_despike_reproduces_delivered_count():
     d = processing.despike(processing.load(os.path.join(RAW, "magnetics", "All_Data_Corrected_Total_Intensity.xlsx")))
     assert int(d["flags"].str.contains("SPIKE").sum()) == 155
     assert int(d["accepted"].sum()) == 12006
+
+
+def test_sgtool_filters_available():
+    """The vendored SGTool filter engine imports without GDAL and filters a grid."""
+    from wghadir.common.sgtool_bridge import sgtool_processor
+
+    z = np.random.default_rng(0).normal(size=(40, 60))
+    gp = sgtool_processor(dx=100.0, dy=100.0)
+    assert gp.tilt_angle(z).shape == z.shape
+    assert np.isfinite(gp.total_horizontal_gradient(z)).all()
+
+
+def test_web_lab_engine_matches_python(tmp_path):
+    """The browser engine (web/src/engine.js, run in Node) reproduces the Python complete Bouguer values."""
+    import json
+    import shutil
+    import subprocess
+    import sys
+
+    node = shutil.which("node")
+    tables = os.path.join(RAW, "..", "..", "outputs", "tables")
+    if node is None or not os.path.exists(os.path.join(tables, "16_field_stations_relative.csv")):
+        pytest.skip("needs Node.js and the outputs of the gravity chain")
+    root = os.path.join(os.path.dirname(__file__), "..")
+    sys.path.insert(0, os.path.join(root, "scripts"))
+    import build_gravity_lab
+
+    data = build_gravity_lab.build(RAW, tables, os.path.join(root, "data", "external"))
+    data.pop("hillshade")
+    (tmp_path / "data.json").write_text(json.dumps(data))
+    js = f"""
+const fs=require('fs'); eval(fs.readFileSync({json.dumps(os.path.join(root, 'web', 'src', 'gl_core.js'))},'utf8').replace('const GL=','global.GL='));
+const E=require({json.dumps(os.path.join(root, 'web', 'src', 'engine.js'))});
+const D=JSON.parse(fs.readFileSync({json.dumps(str(tmp_path / 'data.json'))},'utf8'));
+const st=D.stations.map(r=>Object.fromEntries(D.stationCols.map((c,i)=>[c,r[i]])));
+const R=E.run({{files:D.files,stations:st,ref:D.ref}},{{}},GL.longman);
+const seen=new Set(); const d=[];
+for(const s of R.st.filter(s=>s.ok)){{ if(!D.python[s.key]||seen.has(s.key)) continue; seen.add(s.key); d.push(Math.abs(E.CB(s,2.67)-D.python[s.key][1])); }}
+d.sort((a,b)=>a-b); console.log(JSON.stringify({{n:d.length, median:d[d.length>>1], p99:d[Math.floor(0.99*d.length)]}}));
+"""
+    out = json.loads(subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout)
+    assert out["n"] > 900
+    assert out["median"] < 1e-3 and out["p99"] < 0.01      # mGal

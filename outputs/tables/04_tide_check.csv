@@ -1,13 +1,13 @@
 instrument,model,rms_ugal,max_abs_ugal
-CG6-0313,"Longman at user-entered position, t as UTC",0.208277,0.419939
-CG6-0313,"Longman at CG-6 GPS position, t as UTC",89.6351,215.077
-CG6-0313,"Longman at user position, t shifted -3 h",73.8532,134.167
-CG6-0313,"Longman at user position, t shifted -2 h",50.3093,92.844
-CG6-0313,"Longman at user position, t shifted +2 h",48.7447,93.2889
-CG6-0313,"Longman at user position, t shifted +3 h",68.2619,134.598
-CG6-0640,"Longman at user-entered position, t as UTC",0.193739,0.43327
-CG6-0640,"Longman at CG-6 GPS position, t as UTC",1.83058,3.11511
-CG6-0640,"Longman at user position, t shifted -3 h",70.0431,152.495
-CG6-0640,"Longman at user position, t shifted -2 h",49.9987,98.9306
-CG6-0640,"Longman at user position, t shifted +2 h",49.3266,104.436
-CG6-0640,"Longman at user position, t shifted +3 h",68.9513,162.702
+CG6-0313,"Longman at user-entered position, t as UTC",0.2082774979,0.4199394055
+CG6-0313,"Longman at CG-6 GPS position, t as UTC",89.63510895,215.07712
+CG6-0313,"Longman at user position, t shifted -3 h",73.85323726,134.1670153
+CG6-0313,"Longman at user position, t shifted -2 h",50.3092704,92.84400978
+CG6-0313,"Longman at user position, t shifted +2 h",48.74466578,93.28890563
+CG6-0313,"Longman at user position, t shifted +3 h",68.26194151,134.5981883
+CG6-0640,"Longman at user-entered position, t as UTC",0.1937386158,0.4332696716
+CG6-0640,"Longman at CG-6 GPS position, t as UTC",1.830581324,3.115110828
+CG6-0640,"Longman at user position, t shifted -3 h",70.04310054,152.4952671
+CG6-0640,"Longman at user position, t shifted -2 h",49.99865753,98.93059444
+CG6-0640,"Longman at user position, t shifted +2 h",49.32661265,104.436333
+CG6-0640,"Longman at user position, t shifted +3 h",68.95127361,162.7023977
