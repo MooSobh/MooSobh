@@ -3,6 +3,7 @@
 Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
 """
 import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -180,3 +181,41 @@ console.log(JSON.stringify({{g,line,chi2n:s.chi2n,x:(Ms.xe[jb%Ms.nx]+Ms.xe[jb%Ms
     assert abs(r["chi2n"] - 1) < 0.01
     assert 9000 < r["x"] < 11000 and 600 < r["z"] < 2400
     assert abs(r["fit"] - 200) < 1e-6
+
+
+def test_web_magnetic_lab_engine():
+    """web/src/mag_engine.js: IGRF-14 against ppigrf, the despike and the TMA against the Python chain, 2-D polygon against a line dipole."""
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    qc = os.path.join(root, "outputs", "tables", "30_mag_readings_qc.csv")
+    if node is None or not os.path.exists(qc):
+        pytest.skip("needs Node.js and the magnetic chain results")
+    sys.path.insert(0, os.path.join(root, "scripts"))
+    import build_magnetic_lab as bml
+    tmp = os.path.join(root, "outputs", "_mag_test_input.json")
+    json.dump({"table": bml.readings_table(bml.MAG_FILE), "igrf": bml.igrf_coefficients()}, open(tmp, "w"))
+    src = lambda f: json.dumps(os.path.join(root, "web", "src", f))  # noqa: E731
+    js = f"""
+const fs=require('fs'); eval(fs.readFileSync({src('gl_core.js')},'utf8').replace('const GL=','global.GL='));
+global.ENG=require({src('engine.js')}); global.MOD=require({src('model.js')}); const M=require({src('mag_engine.js')});
+const I=JSON.parse(fs.readFileSync({json.dumps(tmp)})); M.setIGRF(I.igrf); const P=M.mergeParams({{}});
+const L=M.load(M.fromTable(I.table,'x'),P); M.despike(L,P); M.addIGRF(L,P);
+const b=M.igrfAt(M.coeffsAt(M.decYear('2026-01-20')),24.77888,34.85904,0.2344);
+const dip=M.polyTMA([0,300],[[-10,490],[10,490],[10,510],[-10,510]],0,1,0,1,0.001);
+console.log(JSON.stringify({{F:b.F,I:b.I,D:b.D,rows:L.d.map(r=>[r.row,r.ok?1:0,r.tma]),dip}}));
+"""
+    try:
+        out = json.loads(subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout)
+    finally:
+        os.remove(tmp)
+    assert abs(out["F"] - 41983.289) < 0.1 and abs(out["I"] - 36.76755) < 0.001 and abs(out["D"] - 4.22089) < 0.001
+    py = pd.read_csv(qc).set_index("source_row")
+    js_rows = pd.DataFrame(out["rows"], columns=["row", "ok", "tma"]).set_index("row").join(py, how="inner")
+    assert (js_rows["ok"].astype(bool) == js_rows["accepted"]).all()
+    assert np.nanmax(np.abs(js_rows["tma"] - js_rows["tma_nT"])) < 0.1
+    line = [2e-7 * 400 * (500 ** 2 - x ** 2) / (x ** 2 + 500 ** 2) ** 2 * 1e9 for x in (0, 300)]
+    assert np.allclose(out["dip"], line, rtol=1e-4)

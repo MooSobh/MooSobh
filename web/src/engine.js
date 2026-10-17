@@ -520,7 +520,7 @@ function run(input, Praw, longman) {
   return { P, files, rows, occ, st, ref, base, scale, profiles, log };
 }
 
-const API = { DEFAULTS, mergeParams, parseCG6, parseReadingsCSV, parseAny, parseCSV, normaliseStations, stationIndex, run, SB, CB, nettleton, gridStations, crossValidate, contours,
+const API = { DEFAULTS, mergeParams, parseCG6, parseReadingsCSV, parseAny, parseCSV, normaliseStations, stationIndex, run, SB, CB, nettleton, gridStations, crossValidate, contours, fitSpline, blockMedian,
   makeLocal, haversine, normalGravity, freeAir, median, mean, std };
 if (typeof module !== "undefined") module.exports = API;
 return API;

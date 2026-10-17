@@ -20,7 +20,7 @@ With conda or mamba (recommended: rasterio and pyproj come with their binary lib
 ```bash
 conda env create -f environment.yml
 conda activate wghadir
-python -m pytest -q              # 15 tests, about 10 s
+python -m pytest -q              # 16 tests, about 10 s
 ```
 
 With pip, using an existing Python ≥ 3.10:
@@ -47,6 +47,10 @@ jupyter lab notebooks/
 * `notebooks/04_Section_Modelling_pyGIMLi_SimPEG.ipynb`: a cross-section A–B through the residual Bouguer anomaly of
   notebook 03, 2-D forward modelling with polygons and a depth-weighted 2-D inversion with **pyGIMLi** (with L-curve),
   and a 3-D inversion of the gridded residual with **SimPEG**. Results go to `outputs/modelling/`.
+* `notebooks/05_Magnetic_Modelling_pyGIMLi_SimPEG.ipynb`: the strongest magnetic anomaly (south-west) in 3-D: a
+  best-fitting block and a depth-weighted inversion with **pyGIMLi** (`MagneticsModelling`, Holstein kernels) and a
+  susceptibility inversion with χ ≥ 0 with **SimPEG**, cut along a north–south section. Results go to
+  `outputs/modelling_magnetic/`.
 
 Each step has a **✏️ PARAMETERS** cell (thresholds, densities, grid spacing and so on, all editable), a **▶ PROCESSING**
 cell that calls the `wghadir` functions directly, and a **📊 RESULT** cell with tables and plots made in the notebook.
@@ -56,7 +60,13 @@ After a change, re-run that step and the steps below it. The default parameters 
 It runs the gravity chain in JavaScript on the raw CG-6 files, with every parameter adjustable, and accepts your
 own CG-6 exports and station table (chapter 2.1). After gridding (5.1) it offers 16 filters and the power spectrum
 (5.2), cross-sections drawn on the map (6.1), 2-D forward modelling with draggable polygons (6.2), a depth-weighted
-2-D inversion with L-curve (6.3), the pyGIMLi and SimPEG results of notebook 04 (6.4), and exports (7.2). Rebuild it after changing the
+2-D inversion with L-curve (6.3), the pyGIMLi and SimPEG results of notebook 04 (6.4), and exports (7.2).
+
+**Interactive magnetic lab:** `web/Wadi_Ghadir_Magnetic_Lab.html` runs the magnetic chain the same way, from the
+readings (workbook or CSV, chapter 2.1) through day segments, Hampel despike, IGRF-14, crossovers, gridding and
+reduction to the pole to filters and the power spectrum, cross-sections, 2-D magnetic forward modelling (polygons with
+susceptibility and remanence), a 2-D susceptibility inversion with χ ≥ 0 and the pyGIMLi and SimPEG results of
+notebook 05. Rebuild it with `python scripts/build_magnetic_lab.py`. Rebuild it after changing the
 Python results with `python scripts/build_gravity_lab.py`; its sources are in `web/src/`.
 
 **From the command line:**
@@ -66,6 +76,7 @@ python scripts/run_all.py                # gravity, then magnetics (~5 min incl.
 python scripts/run_gravity.py            # gravity only   (--no-figures: ~1 min)
 python scripts/run_magnetics.py          # magnetics only (~1 min)
 python scripts/build_gravity_lab.py      # rebuild web/Wadi_Ghadir_Gravity_Lab.html
+python scripts/build_magnetic_lab.py     # rebuild web/Wadi_Ghadir_Magnetic_Lab.html
 ```
 
 **From Python:**
@@ -112,8 +123,8 @@ All tunable values are in `wghadir/gravity/settings.py` and `wghadir/magnetic/se
 ```
 environment.yml, requirements.txt, pyproject.toml   installation
 notebooks/                 01_Gravity_Processing, 02_Magnetic_Processing, 03_Gravity_OpenSource_Workflow,
-                           04_Section_Modelling_pyGIMLi_SimPEG (.ipynb)
-web/                       Wadi_Ghadir_Gravity_Lab.html (interactive lab) and its sources in web/src/
+                           04_Section_Modelling_pyGIMLi_SimPEG, 05_Magnetic_Modelling_pyGIMLi_SimPEG (.ipynb)
+web/                       Wadi_Ghadir_Gravity_Lab.html, Wadi_Ghadir_Magnetic_Lab.html (interactive labs), sources in web/src/
 third_party/sgtool/        SGTool filter engine (MIT, vendored unchanged; see its README)
 scripts/                   run_all.py, run_gravity.py, run_magnetics.py, build_report_html.py, make_package.py
 wghadir/
@@ -128,7 +139,7 @@ tests/                     regression tests (python -m pytest -q)
 data/raw/                  supplied files, unchanged (SHA-256 in outputs/tables/01_file_inventory.csv)
 data/external/             Copernicus GLO-30 and EGM2008 windows used (with provenance)
 outputs/                   results: deliverables/, tables/, maps/, grids/, figures/, nettleton/, magnetics/,
-                           open_source/ (notebook 03), modelling/ (notebook 04)
+                           open_source/ (notebook 03), modelling/ (notebook 04), modelling_magnetic/ (notebook 05)
 report/                    REPORT.md and REPORT.html
 reference_results/         (zip only) delivered result sheets and summaries, to compare a local run with
 ```

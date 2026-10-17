@@ -49,3 +49,22 @@ Chapter 2.1 of the lab accepts, together or separately:
 `web/examples/` holds a ready-made pair to try: the Wadi Ghadir CG-6 #0640 readings as a readings table and its
 station table. Loading them reproduces the Python complete Bouguer anomalies of those 531 stations to 0.2 µGal
 (`tests/test_core.py::test_web_lab_accepts_uploaded_readings_table`).
+
+## Wadi Ghadir Magnetic Lab
+
+`Wadi_Ghadir_Magnetic_Lab.html` does the same for the ground magnetics, following `wghadir.chains.MagneticChain`:
+
+| Chapter | Content |
+|---|---|
+| 2.1–2.2 | load the workbook (.xlsx, read with SheetJS, loaded on demand) or a CSV; day segments from the time stamps; diurnal correction |
+| 3.1 | Hampel despike (window, k, minimum threshold) with the rejected readings on the map |
+| 3.2 | IGRF-14 at every reading (degree 13, evaluated in JavaScript; within 0.1 nT of ppigrf), date sensitivity |
+| 3.3 | day summary and crossovers between days |
+| 4.1–4.3 | Verde-style gridding (block median, trend, scaled ridge spline), reduction to the pole, 15 filters, power spectrum |
+| 5.1–5.4 | cross-section, 2-D magnetic polygons (induced and remanent magnetisation, via Poisson's relation on the Talwani polygon), 2-D susceptibility inversion with χ ≥ 0, the pyGIMLi and SimPEG results of notebook 05 |
+| 6.1–6.2 | check against the Python chain (same 155 spikes, TMA within 0.02 nT, grids r = 0.99 / 0.98), exports |
+
+Sources: `mag_body.html`, `mag_engine.js` (engine, no DOM) and `mag_lab.js`, with the shared `base.css`, `lab.css`,
+`gl_core.js`, `ui_core.js`, `engine.js` and `model.js`. Build with `python scripts/build_magnetic_lab.py` after the
+magnetic chain (and notebook 05 for chapter 5.4). `web/examples/example_magnetic_readings.csv` is the Wadi Ghadir
+workbook as a CSV, to try the upload. `tests/test_core.py::test_web_magnetic_lab_engine` checks the engine in Node.

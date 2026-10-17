@@ -1,0 +1,48 @@
+<title>Wadi Ghadir Magnetic Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="author" content="Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics), Hannover, Germany">
+<meta name="description" content="Interactive processing of the Wadi Ghadir ground-magnetic survey in the browser: from the readings to RTP maps, filters and 2-D models, with your own data and parameters.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+/*@@CSS@@*/
+</style>
+<!--@@HEAD_END@@-->
+<section class="hero" aria-labelledby="heroTitle">
+  <canvas id="heroBg" aria-hidden="true"></canvas>
+  <div class="hero-in">
+    <div>
+      <p class="eyebrow">Interactive processing lab · ground magnetics</p>
+      <h1 id="heroTitle"><span>Wadi Ghadir</span><span class="hl">Magnetic</span><span>Lab</span></h1>
+      <p class="lede">Process the Wadi Ghadir magnetic survey in your browser, from the total-field readings to reduced-to-pole maps, edge filters and 2-D models. Change any parameter and watch every step update, or load your own readings and run the same chain on them.</p>
+      <div class="byline"><span class="mono" aria-hidden="true">MS</span>
+        <p><span class="who">Written by</span><br><span class="name">Mohamed Sobh, LIAG</span><br><span class="inst">LIAG Institute for Applied Geophysics, Hannover, Germany</span></p></div>
+      <div class="hstats" id="heroStats"><div class="hstat"><b>12 161</b><span>total-field readings</span></div><div class="hstat"><b>10</b><span>survey days</span></div><div class="hstat"><b>42.0k</b><span>nT main field</span></div></div>
+      <div class="hcta"><button class="hbtn go" type="button" data-start="2.1">Start with the data</button><button class="hbtn" type="button" data-start="4.2">Open the maps</button><button class="hbtn" type="button" data-start="2.1" id="heroOwn">Use my own data</button><button class="hbtn" type="button" id="heroSave">Save this lab (HTML)</button></div>
+      <p class="hint" id="heroMsg" aria-live="polite" style="color:#9FB2BF"></p>
+    </div>
+    <figure class="hero-fig">
+      <div class="hero-frame"><canvas id="heroCv" aria-label="Animated map: the Wadi Ghadir magnetic readings appear in the order they were measured, coloured by their total-field anomaly"></canvas></div>
+      <figcaption>Ten days of walking with the magnetometer in the Eastern Desert of Egypt: readings appear in the order they were taken, coloured by the total-field anomaly (TMI − IGRF-14) on the Copernicus GLO-30 relief.</figcaption>
+    </figure>
+  </div>
+</section>
+<header class="appbar">
+  <div class="brand"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v9a6 6 0 0 0 12 0V3" fill="none" stroke="#E8905F" stroke-width="2.4" stroke-linecap="round"/><path d="M4 3.5h4M16 3.5h4" stroke="#F4D7C5" stroke-width="2.4" stroke-linecap="round"/></svg><span>Wadi Ghadir Magnetic Lab <small>by Mohamed Sobh, LIAG</small> <small id="dataBadge">· Wadi Ghadir example data</small></span></div>
+  <button class="abtn" type="button" id="themeBtn" aria-label="Switch between light and dark">Theme</button>
+  <div class="prog" aria-hidden="true"><span id="progBar"></span></div>
+</header>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Processing steps"></nav>
+  <main id="main">
+    <div class="chead" id="chead"></div>
+    <div class="cols"><div id="figs"></div><aside id="ideas" aria-label="Key ideas"></aside></div>
+    <div class="below"><div class="deeper" id="deeper"></div><div id="quiz"></div></div>
+    <div class="nav" id="navBtns"></div>
+  </main>
+</div>
+<footer class="foot"><div class="foot-in"><span><b>Wadi Ghadir Magnetic Lab</b> · written by <b>Mohamed Sobh, LIAG</b> (Leibniz Institute for Applied Geophysics, Hannover, Germany)</span><span>Processing chain ported from the <i>wghadir</i> Python package (MagneticChain). Main field: IGRF-14 (IAGA 2024). Gridding: Verde biharmonic spline (Sandwell 1987). Relief: Copernicus DEM GLO-30 © DLR/Airbus, ESA.</span></div></footer>
+<script>
+/*@@JS@@*/
+</script>
