@@ -189,7 +189,7 @@ CH.push({ id: "1.1", sec: "start", short: "The survey", title: "The Wadi Ghadir 
       html: () => mapHTML("ovMap") + `<div class="legend" id="ovLeg"></div><div class="kpis" id="ovK"></div>`,
       draw() { onPaint(paintOverview); } },
     { title: "The processing chain", sub: "Each step is one chapter. Click a step to open it.",
-      html: () => `<div class="chain">${[["2.1", "Load", "CG-6 files and station table"], ["2.2", "Readings", "Time series, days"], ["3.1", "Quality control", "StdDev, tilt, repeats"], ["3.2", "Earth tide", "Longman (1959)"], ["3.3", "Base and drift", "Piecewise linear"], ["3.4", "Calibration", "Scale of each meter"], ["4.1", "Free-air", "WGS84, 2nd order"], ["4.2", "Bouguer and terrain", "Slab and DEM prisms"], ["4.3", "Density", "Nettleton"], ["5.1", "Gridding", "Biharmonic spline"], ["5.2", "Filters", "Residual, derivatives"], ["6.2", "Export", "CSV, grid, PNG"]].map(([id, t, d]) => `<div class="go" tabindex="0" role="button" data-go="${id}"><i>${id}</i><b>${t}</b>${d}</div>`).join("")}</div>`,
+      html: () => `<div class="chain">${[["2.1", "Load", "CG-6 files and station table"], ["2.2", "Readings", "Time series, days"], ["3.1", "Quality control", "StdDev, tilt, repeats"], ["3.2", "Earth tide", "Longman (1959)"], ["3.3", "Base and drift", "Piecewise linear"], ["3.4", "Calibration", "Scale of each meter"], ["4.1", "Free-air", "WGS84, 2nd order"], ["4.2", "Bouguer and terrain", "Slab and DEM prisms"], ["4.3", "Density", "Nettleton"], ["5.1", "Gridding", "Biharmonic spline"], ["5.2", "Filters", "Residual, derivatives, spectrum"], ["6.1", "Cross-section", "Profile across the map"], ["6.2", "Forward model", "Talwani polygons"], ["6.3", "Inversion", "Depth-weighted 2-D"], ["6.4", "pyGIMLi and SimPEG", "2-D and 3-D inversion"], ["7.2", "Export", "CSV, grid, PNG"]].map(([id, t, d]) => `<div class="go" tabindex="0" role="button" data-go="${id}"><i>${id}</i><b>${t}</b>${d}</div>`).join("")}</div>`,
       draw() { document.querySelectorAll(".chain [data-go]").forEach(el => el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") APPI.go(el.dataset.go, true); }); } },
   ],
   ideas: [["sat", "Relative survey", "No absolute gravity value is available, so every anomaly is given relative to base 100 (line 0, station 100)."],
@@ -540,7 +540,7 @@ CH.push({ id: "5.1", sec: "maps", short: "Gridding and map", title: "From statio
   tag: "The stations are interpolated onto a regular grid with a biharmonic spline after a block median, and nodes far from any station are blanked. Every setting is yours.",
   goal: "grid any anomaly with your settings and read the map.",
   figs: [{ title: "Anomaly map", sub: "Press Compute after changing the grid settings. Move the pointer over the map for values.",
-    html: () => { const g = LAB.ui.g || (LAB.ui.g = { q: hasTerrain() ? "CB" : "SB", method: "spline", cell: 150, block: 200, damp: -1, blank: 2, ci: 1, pal: "anom", power: 2, hill: true, st: true, ct: true });
+    html: () => { const g = gDefaults();
       return `<div class="row">${segHTML("gQ", [["dg", "Δg₁₀₀"], ["dFA", "Free-air"], ["SB", "Simple Bouguer"], ["CB", "Complete Bouguer"]], g.q, "Quantity")}</div>
       <div class="row">Method ${segHTML("gM", [["spline", "Biharmonic spline"], ["idw", "Inverse distance"]], g.method, "Method")} Colours ${segHTML("gP", [["anom", "Blue–red"], ["spectral", "Spectral"], ["viridis", "Viridis"]], g.pal, "Palette")}</div>
       <div class="ctrls tight">${slider("gRho", "Density ρ", 1.8, 3.2, 0.01, P().red.rho, "g/cm³", rhoFmt)}${slider("gCell", "Grid cell", 50, 500, 25, g.cell, "m")}${slider("gBlock", "Block median", 0, 1000, 50, g.block, "m")}${slider("gDamp", "Spline damping (log₁₀)", -4, 2, 0.5, g.damp, "", v => v.toFixed(1))}${slider("gPow", "IDW power", 1, 5, 0.5, g.power, "", v => v.toFixed(1))}${slider("gBlank", "Blank beyond", 0.5, 6, 0.5, g.blank, "km", v => v.toFixed(1))}${slider("gCi", "Contour interval", 0.25, 5, 0.25, g.ci, "mGal", v => v.toFixed(2))}</div>
@@ -558,6 +558,13 @@ CH.push({ id: "5.1", sec: "maps", short: "Gridding and map", title: "From statio
   eqs: [EQ("g(x) = a + b·x + c·y + Σ f<sub>j</sub> r<sub>j</sub>²(ln r<sub>j</sub> − 1)", "Biharmonic spline (Sandwell 1987)"), EQ("(G + λI) f = d − trend", "Fit with damping λ")],
   tries: ["Grid the free-air anomaly, then the complete Bouguer anomaly: which features remain?", "Set the block median to 0 and the damping to −4: do bull's-eyes appear?", "Compare the cross-validation error of spline and inverse distance."],
 });
+function gDefaults() { return LAB.ui.g || (LAB.ui.g = { q: hasTerrain() ? "CB" : "SB", method: "spline", cell: 150, block: 200, damp: -1, blank: 2, ci: 1, pal: "anom", power: 2, hill: true, st: true, ct: true }); }
+/* the current grid of 5.1, computed with its settings when it is missing or out of date */
+function ensureGrid() {
+  gDefaults(); if (LAB.grid && LAB.gridKey === gridKey()) return LAB.grid;
+  try { const pts = gridPts(); if (pts.length < 5) return null; const t = Date.now(); LAB.grid = ENG.gridStations(pts, gridOpts()); LAB.grid.ms = Date.now() - t; LAB.grid.q = LAB.ui.g.q; LAB.grid.cv = null; LAB.gridKey = gridKey(); return LAB.grid; }
+  catch (e) { console.error(e); return null; }
+}
 const gridKey = () => { const g = LAB.ui.g; return JSON.stringify([LAB.input.name, JSON.stringify(P()), g.q, g.method, g.cell, g.block, g.damp, g.power, g.blank]); };
 function gridOpts() { const g = LAB.ui.g; return { method: g.method, cell: g.cell, block: Math.max(1, g.block), mindist: 50, damping: Math.pow(10, g.damp), power: g.power, blankKm: g.blank }; }
 function gridPts() { const g = LAB.ui.g, rho = P().red.rho; return okSt().map(s => ({ lat: s.lat, lon: s.lon, v: value(s, g.q, rho) })).filter(p => isF(p.v)); }
@@ -580,44 +587,421 @@ function paintGrid() {
 }
 
 /* ---------- 5.2 filters ---------- */
+const FILTERS = {
+  sep: [["regional", "Regional"], ["residual", "Residual"], ["lowpass", "Low-pass"], ["highpass", "High-pass"], ["bandpass", "Band-pass"], ["polyreg", "Poly trend"], ["polyres", "Poly residual"]],
+  edge: [["vd", "1VD"], ["vd2", "2VD"], ["dx", "∂/∂x"], ["dy", "∂/∂y"], ["thg", "THG"], ["as", "Analytic signal"], ["tilt", "Tilt"], ["theta", "Theta"], ["tdx", "TDX"]],
+};
+const fDefaults = () => LAB.ui.f || (LAB.ui.f = { type: "residual", up: 3000, lp: 3000, hp: 12000, ord: 2, dup: 0 });
+const km = v => +(v / 1000).toFixed(2);
+/* the filtered grid: {z, name, unit, pal, sym, lim, contours, mgal}; mgal: an anomaly in mGal (usable for modelling) */
+function computeFilter(G, f) {
+  const key = LAB.gridKey + JSON.stringify(f); if (LAB.fcache && LAB.fcache.key === key) return LAB.fcache.out;
+  const gg = { nx: G.nx, ny: G.ny, cell: G.cell, z: G.z };
+  const run = F => Float64Array.from(GL.specFilter(gg, F).out), keep = F => { const r = GL.specFilter(gg, F); return Float64Array.from(r.out, v => v + r.mean); };
+  const diff = (a, b) => Float64Array.from(a, (v, i) => v - b[i]);
+  const ro = k => 1 / (1 + Math.pow(k * 2.5 * G.cell / (2 * Math.PI), 8)) * (f.dup > 0 ? Math.exp(-k * f.dup) : 1);   // roll-off (+ optional upward smoothing)
+  const o = { unit: "mGal", pal: "anom", sym: true, mgal: true, lim: null, contours: null };
+  const up = () => keep(GL.FILT.up(f.up));
+  let out;
+  switch (f.type) {
+    case "regional": out = { z: up(), name: `regional (upward ${km(f.up)} km)`, sym: false }; break;
+    case "residual": out = { z: diff(G.z, up()), name: `residual (grid − upward ${km(f.up)} km)` }; break;
+    case "lowpass": out = { z: keep(GL.FILT.lowpass(f.lp)), name: `low-pass (λ > ${km(f.lp)} km)`, sym: false }; break;
+    case "highpass": out = { z: run(GL.FILT.highpass(f.hp)), name: `high-pass (λ < ${km(f.hp)} km)` }; break;
+    case "bandpass": { const a = GL.FILT.lowpass(f.lp), b = GL.FILT.highpass(f.hp); out = { z: run((kx, ky, k, dc) => [a(kx, ky, k, dc)[0] * b(kx, ky, k, dc)[0], 0]), name: `band-pass (${km(f.lp)}–${km(f.hp)} km)` }; break; }
+    case "polyreg": out = { z: MOD.polyTrend(G, f.ord), name: `polynomial trend, order ${f.ord}`, sym: false }; break;
+    case "polyres": out = { z: diff(G.z, MOD.polyTrend(G, f.ord)), name: `residual of the order-${f.ord} trend` }; break;
+    default: {
+      const dx = run((kx, ky, k) => [0, kx * ro(k)]), dy = run((kx, ky, k) => [0, ky * ro(k)]), vd = run((kx, ky, k) => [k * ro(k), 0]);
+      const thg = Float64Array.from(dx, (v, i) => Math.hypot(v, dy[i])), D = 180 / Math.PI, n = { mgal: false, unit: "mGal/km" };
+      if (f.type === "vd") out = Object.assign(n, { z: vd.map(v => v * 1000), name: "1st vertical derivative" });
+      else if (f.type === "vd2") out = Object.assign(n, { z: run((kx, ky, k) => [k * k * ro(k) * ro(k), 0]).map(v => v * 1e6), name: "2nd vertical derivative", unit: "mGal/km²" });
+      else if (f.type === "dx") out = Object.assign(n, { z: dx.map(v => v * 1000), name: "∂g/∂x (east)" });
+      else if (f.type === "dy") out = Object.assign(n, { z: dy.map(v => v * 1000), name: "∂g/∂y (north)" });
+      else if (f.type === "thg") out = Object.assign(n, { z: thg.map(v => v * 1000), name: "total horizontal gradient", pal: "heat", sym: false });
+      else if (f.type === "as") out = Object.assign(n, { z: Float64Array.from(vd, (v, i) => 1000 * Math.hypot(v, thg[i])), name: "analytic signal", pal: "heat", sym: false });
+      else if (f.type === "tilt") out = Object.assign(n, { z: Float64Array.from(vd, (v, i) => Math.atan2(v, thg[i]) * D), name: "tilt angle", unit: "°", lim: [-90, 90], contours: [0] });
+      else if (f.type === "theta") out = Object.assign(n, { z: Float64Array.from(vd, (v, i) => Math.acos(Math.min(1, thg[i] / (Math.hypot(v, thg[i]) || 1))) * D), name: "theta map", unit: "°", pal: "viridis", sym: false, lim: [0, 90] });
+      else out = Object.assign(n, { z: Float64Array.from(vd, (v, i) => Math.atan2(thg[i], Math.abs(v)) * D), name: "TDX", unit: "°", pal: "heat", sym: false, lim: [0, 90] });
+    }
+  }
+  out = Object.assign({}, o, out); LAB.fcache = { key, out }; return out;
+}
 CH.push({ id: "5.2", sec: "maps", short: "Filters and edges", title: "Regional, residual and edge maps",
-  tag: "Upward continuation keeps the broad field of deep sources; subtracting it leaves the residual of shallow ones. Derivatives sharpen the edges of density contrasts.",
-  goal: "separate regional and residual fields and outline edges with derivatives.",
-  figs: [{ title: "Filtered grid", sub: "Uses the grid of chapter 5.1 (computed there). Filters are applied in the wavenumber domain on the full grid, then blanked.",
-    html: () => { const f = LAB.ui.f || (LAB.ui.f = { type: "residual", up: 3000, hp: 8000, pal: "anom" });
-      return `<div class="row">${segHTML("fT", [["regional", "Regional"], ["residual", "Residual"], ["highpass", "High-pass"], ["vd", "Vertical derivative"], ["thg", "Horizontal gradient"], ["tilt", "Tilt angle"]], f.type, "Filter")}</div>
-      <div class="ctrls">${slider("fUp", "Upward continuation", 500, 10000, 250, f.up, "m")}${slider("fHp", "High-pass wavelength", 2000, 20000, 500, f.hp, "m")}</div>
-      ${mapHTML("fMap")}<canvas class="plot" id="fCb"></canvas><div class="kpis" id="fK"></div>`; },
-    draw() { const f = LAB.ui.f; bindSeg("fT", v => { f.type = v; paintFilter(); }); bindSlider("fUp", "m", v => { f.up = v; paintFilter(); }); bindSlider("fHp", "m", v => { f.hp = v; paintFilter(); }); onPaint(paintFilter); } }],
-  ideas: [["filter", "Upward continuation", "The field as it would be measured h metres higher: short wavelengths decay as e<sup>−kh</sup>."],
-    ["wave", "Derivatives", "The vertical derivative multiplies each wavelength by k: shallow, sharp sources stand out; noise too."],
-    ["target", "Tilt angle", "atan(∂g/∂z ÷ |∇ₕg|) ranges from −90° to 90°; its zero line follows the edges of the sources."]],
-  eqs: [EQ("F(k) = e<sup>−k h</sup>", "Upward continuation"), EQ("F(k) = |k|", "First vertical derivative"), EQ("θ = atan( g<sub>z</sub> / √(g<sub>x</sub>² + g<sub>y</sub>²) )", "Tilt angle")],
+  tag: "Separate the broad field of deep sources from the short wavelengths of shallow ones, then sharpen the edges of density contrasts with derivatives and their normalised forms.",
+  goal: "separate regional and residual fields, read the power spectrum for source depths and outline edges with derivatives.",
+  figs: [{ title: "Filtered grid", sub: "Uses the grid of chapter 5.1. Filters act in the wavenumber domain on the whole grid (padded and tapered), then the map is blanked like the grid. 1VD, 2VD: first and second vertical derivative; THG: total horizontal gradient; TDX: horizontal over vertical derivative.",
+    html: () => { const f = fDefaults();
+      return `<div class="row"><span class="hint" style="margin:0">Separation</span>${segHTML("fT1", FILTERS.sep, f.type, "Separation filters")}</div>
+      <div class="row"><span class="hint" style="margin:0">Edges</span>${segHTML("fT2", FILTERS.edge, f.type, "Edge filters")}</div>
+      <div class="ctrls">${slider("fUp", "Upward continuation", 250, 10000, 250, f.up, "m")}${slider("fLp", "Low-pass: keep λ longer than", 500, 20000, 250, f.lp, "m")}${slider("fHp", "High-pass: keep λ shorter than", 1000, 40000, 500, f.hp, "m")}${slider("fOrd", "Polynomial order", 1, 4, 1, f.ord, "")}${slider("fDup", "Smooth derivatives (upward)", 0, 1500, 50, f.dup, "m")}</div>
+      ${mapHTML("fMap")}<canvas class="plot" id="fCb"></canvas><div class="row"><button class="tbtn" type="button" id="fCsv">Filtered grid (CSV)</button><button class="tbtn go" type="button" data-go="6.1">Take a section of this map →</button><span class="hint" id="fMsg"></span></div><div class="kpis" id="fK"></div>`; },
+    draw() { const f = fDefaults();
+      const pick = v => { f.type = v; ["fT1", "fT2"].forEach(id => $(id).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v))); paintFilter(); };
+      bindSeg("fT1", pick); bindSeg("fT2", pick);
+      bindSlider("fUp", "m", v => { f.up = v; paintFilter(); }); bindSlider("fLp", "m", v => { f.lp = v; paintFilter(); }); bindSlider("fHp", "m", v => { f.hp = v; paintFilter(); });
+      bindSlider("fOrd", "", v => { f.ord = v; paintFilter(); }); bindSlider("fDup", "m", v => { f.dup = v; paintFilter(); });
+      $("fCsv").onclick = () => { const G = LAB.grid; if (!G) return; const F = computeFilter(G, f); saveFile("wadi_ghadir_filtered_grid.csv", gridCSV(F.z, F.name + " [" + F.unit + "]"), "text/csv"); };
+      onPaint(paintFilter); } },
+    { title: "Radially averaged power spectrum", sub: "ln P(k) of the grid. A straight segment of slope s belongs to an ensemble of sources at depth h = −s/2 (Spector & Grant 1970). Move the break between the deep and the shallow segment.",
+      html: () => { const f = fDefaults(); f.kb = f.kb || 0.6; f.kmax = f.kmax || 4;
+        return `<canvas class="plot" id="psCv"></canvas><div class="ctrls">${slider("psKb", "Break wavenumber", 0.1, 3, 0.05, f.kb, "rad/km", v => v.toFixed(2))}${slider("psKm", "Upper end of the shallow fit", 0.5, 15, 0.25, f.kmax, "rad/km", v => v.toFixed(2))}</div><div class="row"><button class="tbtn" type="button" id="psUse">Use 2π/k as the cut-off wavelengths</button></div><div class="kpis" id="psK"></div>`; },
+      draw() { const f = fDefaults(); bindSlider("psKb", "rad/km", v => { f.kb = v; paintSpectrum(); }, v => v.toFixed(2)); bindSlider("psKm", "rad/km", v => { f.kmax = v; paintSpectrum(); }, v => v.toFixed(2));
+        $("psUse").onclick = () => { const w = Math.round(2 * Math.PI / f.kb * 1000 / 250) * 250; f.hp = Math.min(40000, Math.max(1000, w)); f.lp = Math.min(20000, Math.max(500, Math.round(w / 2 / 250) * 250)); f.type = f.type === "bandpass" ? "bandpass" : "highpass"; APPI.go("5.2"); };
+        onPaint(paintSpectrum); } }],
+  ideas: [["filter", "Separation", "Upward continuation, low-pass and polynomial trends estimate the regional field; the residual is the grid minus the regional. The choice of the cut-off is a geological decision."],
+    ["wave", "Derivatives", "The vertical derivative multiplies each wavelength by k, the second by k²: shallow, sharp sources stand out, and so does noise. Upward smoothing tames it."],
+    ["target", "Normalised edges", "Tilt angle (zero over the edges), theta map (minimum over the edges) and TDX (maximum over the edges) balance strong and weak anomalies."],
+    ["ruler", "Spectral depth", "Deep sources dominate the low wavenumbers and decay fast; shallow ones dominate high wavenumbers. Each straight segment of ln P gives a mean depth."]],
+  eqs: [EQ("F(k) = e<sup>−k h</sup>", "Upward continuation"), EQ("F(k) = |k|<sup>n</sup>", "n-th vertical derivative"), EQ("|A| = √(g<sub>x</sub>² + g<sub>y</sub>² + g<sub>z</sub>²)", "Analytic signal"),
+    EQ("θ = atan( g<sub>z</sub> / √(g<sub>x</sub>² + g<sub>y</sub>²) )", "Tilt angle"), EQ("cos φ = √(g<sub>x</sub>² + g<sub>y</sub>²) / |A|", "Theta map"), EQ("ln P(k) ≈ c − 2 h k", "Spectral depth")],
+  tries: ["Compare the residual for 2 km and 6 km upward continuation: which anomalies survive?", "Set the high-pass wavelength from the spectral break and compare it with the residual.", "Switch between tilt, theta and TDX: do they outline the same edges?", "Use the second vertical derivative with and without 300 m upward smoothing."],
   notes: [NOTE("key", "Python companion", "<p>Notebook 03 computes the same maps with Harmonica, the SGTool filter engine and PyGMT.</p>")],
 });
+function noGrid(kpiId) {
+  $(kpiId).innerHTML = KPIT("No grid yet", 'Compute a grid in chapter 5.1 first. <button class="tbtn" type="button" data-go="5.1">Open 5.1</button>');
+  document.querySelectorAll("#" + kpiId + " [data-go]").forEach(b => b.onclick = () => APPI.go("5.1", true));
+}
 function paintFilter() {
-  const cv = $("fMap"); if (!cv) return; const G = LAB.grid;
-  if (!G) { $("fK").innerHTML = KPIT("No grid yet", 'Compute a grid in chapter 5.1 first. <button class="tbtn" type="button" data-go="5.1">Open 5.1</button>'); document.querySelectorAll("#fK [data-go]").forEach(b => b.onclick = () => APPI.go("5.1", true)); return; }
-  const f = LAB.ui.f, gg = { nx: G.nx, ny: G.ny, cell: G.cell, z: G.z };
-  const run = F => Float64Array.from(GL.specFilter(gg, F).out);
-  let z, unit = "mGal", pal = "anom", sym = true, name;
-  const up = () => { const r = GL.specFilter(gg, GL.FILT.up(f.up)); return Float64Array.from(r.out, v => v + r.mean); };
-  if (f.type === "regional") { z = up(); name = "regional"; sym = false; }
-  else if (f.type === "residual") { const u = up(); z = Float64Array.from(G.z, (v, i) => v - u[i]); name = "residual"; }
-  else if (f.type === "highpass") { z = run(GL.FILT.highpass(f.hp)); name = "high-pass"; }
-  else if (f.type === "vd") { z = Float64Array.from(run(GL.FILT.vd(G.cell)), v => v * 1000); unit = "mGal/km"; name = "1VD"; }
-  else { const dx = run(GL.FILT.dx(G.cell)), dy = run(GL.FILT.dy(G.cell)), vd = run(GL.FILT.vd(G.cell));
-    if (f.type === "thg") { z = Float64Array.from(dx, (v, i) => 1000 * Math.hypot(v, dy[i])); unit = "mGal/km"; pal = "heat"; sym = false; name = "THG"; }
-    else { z = Float64Array.from(dx, (v, i) => Math.atan2(vd[i], Math.hypot(v, dy[i])) * 180 / Math.PI); unit = "°"; name = "tilt"; } }
-  const F = Object.assign({}, G, { z }), vals = Array.from(z).filter((v, i) => G.mask[i]);
-  let [lo, hi] = range(vals, sym); if (f.type === "tilt") { lo = -90; hi = 90; }
-  drawMap(cv, { grid: F, lo, hi, pal, contours: f.type === "tilt" ? [0] : null, hill: true, pts: okSt().map(s => ({ lat: s.lat, lon: s.lon, color: "rgba(20,20,20,.5)", r: 1.2, stroke: false, label: stLabel(s) })), tip: $("fMapt"), name, unit });
-  colorBar($("fCb"), pal, lo, hi, unit);
-  $("fK").innerHTML = KPIT("Input grid", QTY[G.q][0], "hl") + KPIT("Filter", name) + KPI("Range", fmt(lo, 2) + " … " + fmt(hi, 2) + ` <small>${unit}</small>`);
+  const cv = $("fMap"); if (!cv) return; const G = ensureGrid();
+  if (!G) { noGrid("fK"); return; }
+  const f = fDefaults(), F = computeFilter(G, f), vals = Array.from(F.z).filter((v, i) => G.mask[i]);
+  let [lo, hi] = F.lim || range(vals, F.sym);
+  drawMap(cv, { grid: Object.assign({}, G, { z: F.z }), lo, hi, pal: F.pal, contours: F.contours, hill: true, pts: okSt().map(s => ({ lat: s.lat, lon: s.lon, color: "rgba(20,20,20,.5)", r: 1.2, stroke: false, label: stLabel(s) })), tip: $("fMapt"), name: F.name, unit: F.unit });
+  colorBar($("fCb"), F.pal, lo, hi, F.unit);
+  $("fK").innerHTML = KPIT("Input grid", QTY[G.q][0], "hl") + KPIT("Filter", F.name) + KPI("Range", fmt(lo, 2) + " … " + fmt(hi, 2) + ` <small>${F.unit}</small>`);
+}
+function paintSpectrum() {
+  const cv = $("psCv"); if (!cv) return; const G = ensureGrid(); if (!G) { plot(cv, { series: [], xlim: [0, 1], h: 160 }); return; }
+  if (!LAB.spec || LAB.spec.key !== LAB.gridKey) LAB.spec = { key: LAB.gridKey, sp: MOD.radialSpectrum(G) };
+  const f = fDefaults(), sp = LAB.spec.sp, kmax = Math.min(f.kmax, sp.k[sp.k.length - 1]);
+  const d = MOD.depthFit(sp, sp.k[0], f.kb), s = MOD.depthFit(sp, f.kb, kmax), line = (q, col, nm) => q ? [{ name: nm, x: [q.k0, q.k1], y: [q.icpt + q.slope * q.k0, q.icpt + q.slope * q.k1], color: col, w: 2.4, dash: [6, 4], dec: 2 }] : [];
+  plot(cv, { series: [{ name: "ln P", x: sp.k, y: sp.lnP, color: css("--ink"), dots: true, r: 2.8, dec: 2 }].concat(line(d, "#2356C8", "deep fit"), line(s, acc(), "shallow fit")),
+    xlim: [0, Math.min(sp.k[sp.k.length - 1], Math.max(f.kmax * 1.4, 6))], vlines: [{ x: f.kb, color: "#2356C8", label: "break" }], xlabel: "wavenumber k [rad/km]", ylabel: "ln power", xname: "k", xfmt: v => fmt(v, 1), h: 260 });
+  $("psK").innerHTML = KPI("Deep sources", d ? fmt(d.depth, 2) + " <small>km</small>" : "–", "hl") + KPI("Shallow sources", s ? fmt(s.depth, 2) + " <small>km</small>" : "–") + KPI("Wavelength at the break", fmt(2 * Math.PI / f.kb, 1) + " <small>km</small>") + KPIT("Note", "Depths are below the observation surface; the grid spacing limits the shallow estimate.");
 }
 
-/* ---------- 6.1 validation ---------- */
-CH.push({ id: "6.1", sec: "out", short: "Check against Python", title: "Check against the Python processing chain",
+/* ================================================================ MODELLING: sections, forward model, inversion */
+const PYM = WG_DATA.model || null;          // pyGIMLi and SimPEG results of notebook 04 (Wadi Ghadir only)
+function sDefaults() {
+  const s = LAB.ui.s || (LAB.ui.s = { step: 250, corr: 500, field: "filter", next: "A" });
+  const E = mapExtent(), inside = p => p && p[0] > E.lat0 && p[0] < E.lat1 && p[1] > E.lon0 && p[1] < E.lon1;
+  if (!inside(s.A) || !inside(s.B)) {
+    if (PYM && inside([PYM.A[1], PYM.A[0]]) && inside([PYM.B[1], PYM.B[0]])) { s.A = [PYM.A[1], PYM.A[0]]; s.B = [PYM.B[1], PYM.B[0]]; }
+    else { const fx = (E.lon1 - E.lon0) * 0.18, fy = (E.lat1 - E.lat0) * 0.18; s.A = [E.lat0 + fy, E.lon0 + fx]; s.B = [E.lat1 - fy, E.lon1 - fx]; }
+  }
+  return s;
+}
+/* the field shown in the sections: the 5.1 grid or the 5.2 filter output */
+function sectionField(G) {
+  const s = sDefaults();
+  if (s.field === "filter") return computeFilter(G, fDefaults());
+  return { z: G.z, name: QTY[G.q][0] + (G.q === "SB" || G.q === "CB" ? ` (ρ ${P().red.rho.toFixed(2)})` : ""), unit: "mGal", mgal: true, pal: "anom", sym: G.q === "SB" || G.q === "CB" };
+}
+function sampleGrid(G, z, x, y) {
+  const fx = (x - G.x0) / G.cell, fy = (y - G.y0) / G.cell, c = Math.floor(fx), r = Math.floor(fy);
+  if (c < 0 || r < 0 || c >= G.nx - 1 || r >= G.ny - 1) return NaN;
+  const i = r * G.nx + c; if (!G.mask[i] || !G.mask[i + 1] || !G.mask[i + G.nx] || !G.mask[i + G.nx + 1]) return NaN;
+  const a = fx - c, b = fy - r; return z[i] * (1 - a) * (1 - b) + z[i + 1] * a * (1 - b) + z[i + G.nx] * (1 - a) * b + z[i + G.nx + 1] * a * b;
+}
+function heightGrid(G) {
+  const key = LAB.input.name + "|" + (R() ? R().st.length : 0) + "|" + G.x0 + G.y0;
+  if (LAB.hgrid && LAB.hgrid.key === key) return LAB.hgrid.g;
+  const pts = okSt().filter(s => isF(s.H)).map(s => ({ lat: s.lat, lon: s.lon, v: s.H }));
+  let g = null; try { if (pts.length >= 5) g = ENG.gridStations(pts, Object.assign(gridOpts(), { cell: Math.max(250, LAB.ui.g.cell) })); } catch (e) { console.error(e); }
+  LAB.hgrid = { key, g }; return g;
+}
+/* the section A–B: profile points, field values, topography and the stations in the corridor */
+function sectionData() {
+  const G = ensureGrid(); if (!G) return null;
+  const s = sDefaults(), F = sectionField(G), [xa, ya] = G.local.fwd(s.A[0], s.A[1]), [xb, yb] = G.local.fwd(s.B[0], s.B[1]);
+  const L = Math.hypot(xb - xa, yb - ya), ux = (xb - xa) / L, uy = (yb - ya) / L;
+  const key = [LAB.gridKey, LAB.fcache && LAB.fcache.key, s.field, s.A, s.B, s.step, s.corr].join("|");
+  if (LAB.sec && LAB.sec.key === key) return LAB.sec;
+  const HG = heightGrid(G), x = [], v = [], topo = [], lat = [], lon = [];
+  for (let t = 0; t <= L + 1e-6; t += s.step) {
+    const px = xa + ux * t, py = ya + uy * t, [la, lo] = G.local.inv(px, py);
+    x.push(t); v.push(sampleGrid(G, F.z, px, py)); lat.push(la); lon.push(lo);
+    if (HG) { const [hx, hy] = HG.local.fwd(la, lo); topo.push(sampleGrid(HG, HG.z, hx, hy)); } else topo.push(NaN);
+  }
+  const rho = P().red.rho, st = [];
+  for (const o of okSt()) {
+    const [px, py] = G.local.fwd(o.lat, o.lon), t = (px - xa) * ux + (py - ya) * uy, d = -(px - xa) * uy + (py - ya) * ux;
+    if (t >= 0 && t <= L && Math.abs(d) <= s.corr) st.push({ t, d, H: o.H, v: value(o, G.q, rho), label: stLabel(o) });
+  }
+  LAB.sec = { key, L, x, v, topo, lat, lon, st, name: F.name, unit: F.unit, mgal: F.mgal, az: (Math.atan2(ux, uy) * 180 / Math.PI + 360) % 360 };
+  return LAB.sec;
+}
+/* data for the modelling chapters: the section where it has values (an mGal field), mean removed */
+function modelData() {
+  const S = sectionData(); if (!S) return null;
+  const ok = S.x.map((_, i) => i).filter(i => isF(S.v[i])); if (ok.length < 6) return { S, err: "The section has fewer than 6 points with data: move A and B into the survey area (chapter 6.1)." };
+  if (!S.mgal) return { S, err: `The section shows ${S.name} [${S.unit}]. Modelling needs an anomaly in mGal: choose the grid or a separation filter in chapter 6.1.` };
+  const x = ok.map(i => S.x[i]), d = MOD.centred(ok.map(i => S.v[i]));
+  return { S, x, d, key: S.key };
+}
+/* the section canvas: depth section with model cells, bodies and handles */
+function drawSection(cv, o) {
+  const { ctx, W, H } = setup(cv, o.h || 300), pad = { l: 58, r: 12, t: 10, b: 38 }, [x0, x1] = o.xlim, zmax = o.zmax;
+  const X = x => pad.l + (x - x0) / (x1 - x0) * (W - pad.l - pad.r), Z = z => pad.t + z / zmax * (H - pad.t - pad.b);
+  const inv = (px, py) => [x0 + (px - pad.l) / (W - pad.l - pad.r) * (x1 - x0), (py - pad.t) / (H - pad.t - pad.b) * zmax];
+  ctx.fillStyle = css("--paper2"); ctx.fillRect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b);
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b); ctx.clip();
+  if (o.cells) { const c = o.cells, lim = c.lim;
+    for (let iz = 0; iz < c.ze.length - 1; iz++) for (let ix = 0; ix < c.xe.length - 1; ix++) { const v = c.m[iz * (c.xe.length - 1) + ix]; if (v === null || !isF(v)) continue;
+      ctx.fillStyle = lutCol("anom", (v + lim) / (2 * lim)); const xa = X(c.xe[ix]), xb = X(c.xe[ix + 1]), za = Z(c.ze[iz]), zb = Z(c.ze[iz + 1]); ctx.fillRect(xa, za, xb - xa + 0.6, zb - za + 0.6); } }
+  (o.bodies || []).forEach((b, k) => {
+    ctx.beginPath(); b.xy.forEach(([x, z], i) => { if (i) ctx.lineTo(X(x), Z(z)); else ctx.moveTo(X(x), Z(z)); }); ctx.closePath();
+    if (!o.outline) { ctx.fillStyle = b.drho >= 0 ? "rgba(214,72,52,.42)" : "rgba(43,110,214,.42)"; ctx.fill(); }
+    ctx.strokeStyle = k === o.sel ? css("--ink") : "rgba(20,25,30,.7)"; ctx.lineWidth = k === o.sel ? 2.2 : 1.2; ctx.setLineDash(o.outline ? [5, 3] : []); ctx.stroke(); ctx.setLineDash([]);
+    if (o.handles) b.xy.forEach(([x, z]) => { ctx.beginPath(); ctx.arc(X(x), Z(z), k === o.sel ? 5.5 : 3.5, 0, 6.283); ctx.fillStyle = k === o.sel ? acc() : css("--paper"); ctx.fill(); ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.2; ctx.stroke(); });
+    if (!o.outline) { const cx = b.xy.reduce((a, p) => a + p[0], 0) / b.xy.length, cz = b.xy.reduce((a, p) => a + p[1], 0) / b.xy.length; ctx.fillStyle = css("--ink"); ctx.font = "700 12px " + css("--disp"); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText((b.drho > 0 ? "+" : "") + Math.round(b.drho), X(cx), Z(cz)); }
+  });
+  ctx.restore();
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1; ctx.strokeRect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b);
+  ctx.fillStyle = css("--muted"); ctx.strokeStyle = css("--rule"); ctx.font = "500 12px " + css("--disp");
+  const tx = nice(x0 / 1000, x1 / 1000, W < 480 ? 4 : 7), tz = nice(0, zmax / 1000, 4);
+  ctx.textAlign = "center"; ctx.textBaseline = "top"; tx.ticks.forEach(v => { const px = X(v * 1000); if (px < pad.l - 1 || px > W - pad.r + 1) return; ctx.fillRect(px, H - pad.b, 1, 4); ctx.fillText(String(+v.toFixed(3)), px, H - pad.b + 6); });
+  ctx.fillText("distance from A [km]", pad.l + (W - pad.l - pad.r) / 2, H - 15);
+  ctx.textAlign = "right"; ctx.textBaseline = "middle"; tz.ticks.forEach(v => { const py = Z(v * 1000); if (py > H - pad.b + 1) return; ctx.fillRect(pad.l - 4, py, 4, 1); ctx.fillText(String(+v.toFixed(3)), pad.l - 6, py); });
+  ctx.save(); ctx.translate(13, pad.t + (H - pad.t - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("depth [km]", 0, 0); ctx.restore();
+  if (o.label) { ctx.fillStyle = "rgba(255,255,255,.86)"; ctx.font = "700 12px " + css("--disp"); const tw = ctx.measureText(o.label).width; ctx.fillRect(pad.l + 6, H - pad.b - 24, tw + 12, 18); ctx.fillStyle = "#111"; ctx.textAlign = "left"; ctx.fillText(o.label, pad.l + 12, H - pad.b - 15); }
+  return { X, Z, inv, pad, W, H };
+}
+const secXlim = S => [-0.03 * S.L, 1.03 * S.L];
+/* the A–B line, corridor and an optional marker, on a transparent canvas over a map */
+function drawLineOverlay(ov, T, S, s, at) {
+  const { ctx } = setup(ov, ov.parentNode.querySelector("canvas.plot").clientHeight);
+  if (!T || !S) return; const pA = [T.X(s.A[1]), T.Y(s.A[0])], pB = [T.X(s.B[1]), T.Y(s.B[0])], len = Math.hypot(pB[0] - pA[0], pB[1] - pA[1]) || 1;
+  const kmpx = len / S.L, nx = -(pB[1] - pA[1]) / len, ny = (pB[0] - pA[0]) / len, w = s.corr * kmpx;
+  ctx.fillStyle = "rgba(255,210,63,.18)"; ctx.beginPath(); ctx.moveTo(pA[0] + nx * w, pA[1] + ny * w); ctx.lineTo(pB[0] + nx * w, pB[1] + ny * w); ctx.lineTo(pB[0] - nx * w, pB[1] - ny * w); ctx.lineTo(pA[0] - nx * w, pA[1] - ny * w); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "#111"; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(...pA); ctx.lineTo(...pB); ctx.stroke(); ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = 2.2; ctx.stroke();
+  [["A", pA], ["B", pB]].forEach(([t, p]) => { ctx.beginPath(); ctx.arc(p[0], p[1], 10, 0, 6.283); ctx.fillStyle = "#111"; ctx.fill(); ctx.fillStyle = "#ffd23f"; ctx.font = "800 12px " + css("--disp"); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(t, p[0], p[1] + 0.5); });
+  if (isF(at)) { const f = at / S.L, p = [pA[0] + (pB[0] - pA[0]) * f, pA[1] + (pB[1] - pA[1]) * f]; ctx.beginPath(); ctx.arc(p[0], p[1], 6, 0, 6.283); ctx.fillStyle = acc(); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); }
+}
+
+/* ---------- 6.1 cross-section ---------- */
+CH.push({ id: "6.1", sec: "model", short: "Cross-section", title: "A cross-section through the anomaly",
+  tag: "Draw a line across the map and read the anomaly, the topography and the nearby stations along it. The section feeds the forward model and the inversion of the next chapters.",
+  goal: "place a section across an anomaly and extract its profile.",
+  figs: [{ title: "Section line", sub: "Click the map to set A, click again to set B. The yellow band is the corridor from which stations are projected onto the section.",
+    html: () => { const s = sDefaults();
+      return `<div class="row">Field ${segHTML("sF", [["grid", "Grid of 5.1"], ["filter", "Filter of 5.2"]], s.field, "Field")}<button class="tbtn" type="button" id="sSwap">Swap A and B</button><button class="tbtn" type="button" id="sDef">Default line</button><span class="hint" id="sNext" style="margin:0"></span></div>
+      ${mapHTML("sMap", '<canvas class="mapov" id="sOv" aria-hidden="true"></canvas>')}<canvas class="plot" id="sCb"></canvas>
+      <div class="ctrls">${slider("sStep", "Point spacing", 50, 1000, 50, s.step, "m")}${slider("sCorr", "Station corridor (±)", 100, 3000, 100, s.corr, "m")}</div>`; },
+    draw() { const s = sDefaults();
+      bindSeg("sF", v => { s.field = v; paintSection(); }); bindSlider("sStep", "m", v => { s.step = v; paintSection(); }); bindSlider("sCorr", "m", v => { s.corr = v; paintSection(); });
+      $("sSwap").onclick = () => { [s.A, s.B] = [s.B, s.A]; paintSection(); }; $("sDef").onclick = () => { s.A = s.B = null; s.next = "A"; paintSection(); };
+      $("sMap").onclick = e => { if (!LAB.secT) return; const r = $("sMap").getBoundingClientRect(), [la, lo] = LAB.secT.inv(e.clientX - r.left, e.clientY - r.top); const E = mapExtent(); if (la < E.lat0 || la > E.lat1 || lo < E.lon0 || lo > E.lon1) return;
+        if (s.next === "A") { s.A = [la, lo]; s.next = "B"; } else { s.B = [la, lo]; s.next = "A"; } if (Math.hypot(s.A[0] - s.B[0], s.A[1] - s.B[1]) < 1e-3) return; paintSection(); };
+      onPaint(paintSection); } },
+    { title: "Profile A–B", sub: "Top: the field along the section and the stations in the corridor (grid field only). Bottom: topography from the station heights. Move the pointer along the profile to find the point on the map.",
+      html: () => `<canvas class="plot" id="sPr"></canvas><canvas class="plot" id="sTo"></canvas><div class="row"><button class="tbtn" type="button" id="sCsv">Profile (CSV)</button><button class="tbtn go" type="button" data-go="6.2">Model this section →</button><span class="hint" id="sMsg"></span></div><div class="kpis" id="sK"></div>`,
+      draw() { $("sCsv").onclick = () => { const S = sectionData(); if (S) saveFile("wadi_ghadir_section.csv", sectionCSV(S), "text/csv"); }; } }],
+  ideas: [["ruler", "Across the strike", "Draw the section perpendicular to the elongation of the anomaly: the 2-D models of the next chapters assume bodies infinitely long across the section."],
+    ["layers", "Which field", "Model the residual for shallow bodies; the complete Bouguer anomaly also holds the regional trend of deep sources."],
+    ["map", "Corridor", "Stations within the corridor are projected perpendicularly onto the line; their scatter shows how well the grid follows the data."]],
+  tries: ["Draw a section across the central high and compare the grid and the residual.", "Widen the corridor: do the station values scatter more around the grid profile?", "Does the anomaly follow the topography (a wrong Bouguer density) or not?"],
+});
+function sectionCSV(S) {
+  return [`# Wadi Ghadir Gravity Lab, written by ${AUTHOR}. Section A (${S.lat[0].toFixed(6)}, ${S.lon[0].toFixed(6)}) – B (${S.lat[S.lat.length - 1].toFixed(6)}, ${S.lon[S.lon.length - 1].toFixed(6)}). Field: ${S.name} [${S.unit}].`,
+    "distance_m,lat,lon,field,topography_m"].concat(S.x.map((x, i) => [x.toFixed(1), S.lat[i].toFixed(7), S.lon[i].toFixed(7), isF(S.v[i]) ? S.v[i].toFixed(4) : "", isF(S.topo[i]) ? S.topo[i].toFixed(1) : ""].join(","))).join("\n");
+}
+function paintSection() {
+  const cv = $("sMap"); if (!cv) return; const G = ensureGrid(); if (!G) { noGrid("sK"); return; }
+  const s = sDefaults(), F = sectionField(G), S = sectionData(), vals = Array.from(F.z).filter((v, i) => G.mask[i]);
+  const [lo, hi] = F.lim || range(vals, F.sym);
+  LAB.secT = drawMap(cv, { grid: Object.assign({}, G, { z: F.z }), lo, hi, pal: F.pal, contours: F.contours, hill: true, pts: okSt().map(o => ({ lat: o.lat, lon: o.lon, color: "rgba(20,20,20,.5)", r: 1.2, stroke: false, label: stLabel(o) })), tip: $("sMapt"), name: F.name, unit: F.unit });
+  drawLineOverlay($("sOv"), LAB.secT, S, s); colorBar($("sCb"), F.pal, lo, hi, F.unit);
+  $("sNext").textContent = "Next click sets " + s.next + ".";
+  const xk = S.x.map(v => v / 1000), xl = [0, S.L / 1000], hov = x => drawLineOverlay($("sOv"), LAB.secT, S, s, x === null ? NaN : x * 1000);
+  const ser = [{ name: F.name, x: xk, y: S.v, color: acc(), w: 2.4, unit: F.unit, dec: 2 }];
+  if (s.field === "grid" && S.st.length) ser.push({ name: "stations", x: S.st.map(q => q.t / 1000), y: S.st.map(q => q.v), color: "rgba(20,25,30,.6)", dots: true, r: 2.6, unit: "mGal", dec: 2 });
+  if (s.field === "filter" && F.mgal) ser.push({ name: "grid (5.1)", x: xk, y: S.x.map((x, i) => { const [px, py] = G.local.fwd(S.lat[i], S.lon[i]); return sampleGrid(G, G.z, px, py); }), color: "#7f8a93", w: 1.4, dash: [5, 4], unit: "mGal", dec: 2, y2: true });
+  plot($("sPr"), { series: ser, xlim: xl, ylabel: F.unit, xlabel: "", xname: "km", xfmt: v => fmt(v, 1), h: 230, y2: ser.some(q => q.y2), y2label: "grid [mGal]", onHover: hov, snap: 0.6 });
+  const th = S.topo.filter(isF), base = th.length ? Math.min(...th, ...S.st.map(q => q.H).filter(isF)) - 10 : 0;
+  plot($("sTo"), { series: [{ name: "topography", x: xk, y: S.topo, color: "#b48f5c", w: 2, fill: base, fillAlpha: 0.3, unit: "m", dec: 0 }, { name: "station H", x: S.st.map(q => q.t / 1000), y: S.st.map(q => q.H), color: "#6b4f2a", dots: true, r: 2.4, unit: "m", dec: 1 }],
+    xlim: xl, ylabel: "H [m]", xlabel: "distance from A [km]", xname: "km", xfmt: v => fmt(v, 1), h: 150, onHover: hov, snap: 0.6 });
+  const nv = S.v.filter(isF).length;
+  $("sK").innerHTML = KPI("Length", fmt(S.L / 1000, 2) + " <small>km</small>", "hl") + KPI("Azimuth A→B", fmt(S.az, 0) + "°") + KPI("Points with data", nv + " / " + S.x.length) + KPI("Stations in the corridor", S.st.length) + KPIT("Field", esc(S.name));
+}
+
+/* ---------- 6.2 forward model ---------- */
+const FWD_START = PYM ? PYM.bodies : null;
+function fmDefaults(S) {
+  const m = LAB.ui.fm || (LAB.ui.fm = { sel: 0, zmax: 6000 });
+  if (!m.bodies || m.forL !== Math.round(S.L)) {
+    const useNb = FWD_START && PYM && Math.abs(PYM.L - S.L) < 50 && sDefaults().A && Math.abs(sDefaults().A[0] - PYM.A[1]) < 1e-4;
+    m.bodies = useNb ? FWD_START.map(b => ({ name: b.name, drho: b.drho, xy: b.xy.map(([x, z]) => [x * 1000, z * 1000]) }))
+      : [{ name: "body 1", drho: 150, xy: [[0.4 * S.L, 800], [0.6 * S.L, 800], [0.6 * S.L, 2000], [0.4 * S.L, 2000]] }];
+    m.forL = Math.round(S.L); m.sel = 0;
+  }
+  return m;
+}
+CH.push({ id: "6.2", sec: "model", short: "Forward model", title: "Forward modelling with 2-D polygons",
+  tag: "Build a density model of the section from polygons and compare its gravity effect with the data. Every polygon is a 2-D body that extends without end across the section (Talwani et al. 1959).",
+  goal: "test a geological hypothesis: shapes, depths and density contrasts that explain the anomaly.",
+  figs: [{ title: "Data and model response", sub: "The data and the response are compared without their means (the absolute level of relative gravity is unknown).",
+    html: () => `<canvas class="plot" id="mPr"></canvas><div class="kpis" id="mK"></div>`, draw() { onPaint(paintForward); } },
+    { title: "Density model", sub: "Drag a vertex to reshape a body, drag inside a body to move it. Double-click an edge to add a vertex, double-click a vertex to remove it. The numbers are density contrasts in kg/m³.",
+      html: () => { const m = LAB.ui.fm || { zmax: 6000 };
+        return `<div class="row" id="mSelRow"></div><canvas class="plot" id="mSec" style="touch-action:none;cursor:grab"></canvas>
+        <div class="ctrls">${slider("mRho", "Density contrast of the body", -800, 800, 10, 0, "kg/m³")}${slider("mZ", "Depth of the section", 2000, 15000, 500, m.zmax, "m")}</div>
+        <div class="row"><button class="tbtn go" type="button" id="mFit">Fit the densities</button><button class="tbtn" type="button" id="mAdd">Add a body</button><button class="tbtn" type="button" id="mDel">Delete the body</button><button class="tbtn" type="button" id="mReset">Start again</button><button class="tbtn" type="button" id="mCsv">Model (CSV)</button><span class="hint" id="mMsg"></span></div>`; },
+      draw() { bindSlider("mRho", "kg/m³", v => { const m = LAB.ui.fm; if (m && m.bodies[m.sel]) { m.bodies[m.sel].drho = v; paintForward(); } });
+        bindSlider("mZ", "m", v => { LAB.ui.fm.zmax = v; paintForward(); });
+        $("mFit").onclick = () => { const D = modelData(), m = LAB.ui.fm; if (!D || D.err || !m.bodies.length) return; try { const r = MOD.fitDensities(D.x, D.d, m.bodies); m.bodies.forEach((b, k) => { b.drho = Math.round(r[k]); }); $("mMsg").textContent = "Densities fitted by least squares."; } catch (e) { $("mMsg").textContent = "The bodies cannot be fitted separately (they are too similar)."; } paintForward(); };
+        $("mAdd").onclick = () => { const m = LAB.ui.fm, S = sectionData(); if (!S) return; const c = S.L * (0.3 + 0.4 * Math.random()), w = S.L * 0.08, z = m.zmax * 0.15; m.bodies.push({ name: "body " + (m.bodies.length + 1), drho: 100, xy: [[c - w, z], [c + w, z], [c + w, 2.5 * z], [c - w, 2.5 * z]] }); m.sel = m.bodies.length - 1; paintForward(); };
+        $("mDel").onclick = () => { const m = LAB.ui.fm; if (!m.bodies.length) return; m.bodies.splice(m.sel, 1); m.sel = Math.max(0, m.sel - 1); paintForward(); };
+        $("mReset").onclick = () => { LAB.ui.fm.bodies = null; paintForward(); };
+        $("mCsv").onclick = () => { const m = LAB.ui.fm; if (m) saveFile("wadi_ghadir_forward_model.csv", [`# Wadi Ghadir Gravity Lab, written by ${AUTHOR}. 2-D bodies along the section: distance from A [m], depth [m], density contrast [kg/m³].`, "body,vertex,distance_m,depth_m,drho_kgm3"].concat(m.bodies.flatMap((b, k) => b.xy.map((p, i) => [k + 1, i + 1, p[0].toFixed(1), p[1].toFixed(1), b.drho].join(",")))).join("\n"), "text/csv"); };
+        bindSectionDrag(); } }],
+  ideas: [["cube", "2-D bodies", "Each polygon extends infinitely across the section. This is a good approximation where the anomaly is at least two to three times longer than it is wide."],
+    ["scale", "Ambiguity", "A deep, dense body and a shallow, wide body can give the same anomaly. The data fix the excess mass, not its shape: add geology to decide."],
+    ["target", "Linear in density", "The response is linear in the density contrasts, so for fixed shapes the best densities follow from least squares (button Fit)."]],
+  eqs: [EQ("Δg(x) = 2Gρ Σ<sub>k</sub> f(x<sub>k</sub>, z<sub>k</sub>, x<sub>k+1</sub>, z<sub>k+1</sub>)", "Talwani et al. (1959)"), EQ("Δg<sub>max</sub> ≈ 2πGΔρ t", "Wide slab of thickness t")],
+  tries: ["Move the dense block 1 km deeper: how must its density change to keep the amplitude?", "Delete all bodies but one and press Fit: can one body explain the whole profile?", "Make the light basin fill thinner and press Fit. Which density does it need?"],
+  notes: [NOTE("key", "Python companion", "<p>Notebook 04 runs the same polygons with pyGIMLi (<code>solveGravimetry</code>); chapter 6.4 shows its results.</p>")],
+});
+function paintForward() {
+  const pr = $("mPr"); if (!pr) return; const D = modelData();
+  if (!D) { noGrid("mK"); return; }
+  if (D.err) { plot(pr, { series: [], xlim: [0, 1], h: 140 }); $("mK").innerHTML = KPIT("Section", esc(D.err), "bad"); return; }
+  const S = D.S, m = fmDefaults(S), resp = MOD.centred(MOD.forward(D.x, m.bodies)), xl = secXlim(S).map(v => v / 1000);
+  plot(pr, { series: [{ name: "data", x: D.x.map(v => v / 1000), y: D.d, color: css("--ink"), dots: true, r: 2.6, unit: "mGal", dec: 2 }, { name: "model", x: D.x.map(v => v / 1000), y: resp, color: acc(), w: 2.6, unit: "mGal", dec: 2 }, { name: "residual", x: D.x.map(v => v / 1000), y: D.d.map((v, i) => v - resp[i]), color: "#7f8a93", w: 1.2, dash: [4, 3], unit: "mGal", dec: 2 }],
+    xlim: xl, ylabel: "mGal", xlabel: "", xname: "km", xfmt: v => fmt(v, 1), h: 220, hlines: [{ y: 0 }] });
+  const sec = $("mSec"); if (sec) { LAB.fmT = drawSection(sec, { xlim: secXlim(S), zmax: m.zmax, bodies: m.bodies, sel: m.sel, handles: true, h: Math.min(360, Math.max(240, sec.clientWidth * 0.42)) }); }
+  const row = $("mSelRow"); if (row) { row.innerHTML = m.bodies.length ? "Body " + segHTML("mSel", m.bodies.map((b, k) => [k, `${k + 1}: ${(b.drho > 0 ? "+" : "") + b.drho}`]), m.sel, "Selected body") : '<span class="hint">No bodies: press Add a body.</span>'; bindSeg("mSel", v => { m.sel = +v; paintForward(); }); }
+  const rs = $("mRho"); if (rs && m.bodies[m.sel]) { rs.value = m.bodies[m.sel].drho; $("mRhoo").textContent = m.bodies[m.sel].drho + " kg/m³"; }
+  const r = MOD.rms(resp, D.d), r0 = MOD.rms(D.d.map(() => 0), D.d);
+  $("mK").innerHTML = KPI("rms misfit", fmt(r, 2) + " <small>mGal</small>", r < 0.3 * r0 ? "ok" : "hl") + KPI("Data rms", fmt(r0, 2) + " <small>mGal</small>") + KPI("Explained", fmt(100 * (1 - (r * r) / (r0 * r0 || 1)), 0) + " <small>%</small>") + KPI("Bodies", m.bodies.length) + KPIT("Field", esc(S.name));
+}
+function bindSectionDrag() {
+  const cv = $("mSec"); if (!cv) return; let drag = null, raf = 0;
+  const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const near = (px, py) => { const T = LAB.fmT, m = LAB.ui.fm; if (!T || !m) return null; let best = null, bd = 13 * 13;
+    m.bodies.forEach((b, k) => b.xy.forEach(([x, z], i) => { const d = (T.X(x) - px) ** 2 + (T.Z(z) - py) ** 2 - (k === m.sel ? 20 : 0); if (d < bd) { bd = d; best = { k, i }; } })); return best; };
+  const inside = (b, x, z) => { let c = false; for (let i = 0, j = b.xy.length - 1; i < b.xy.length; j = i++) { const [xi, zi] = b.xy[i], [xj, zj] = b.xy[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+  const clampZ = z => Math.max(0, Math.min(LAB.ui.fm.zmax, z));
+  cv.onpointerdown = e => { const [px, py] = pos(e), m = LAB.ui.fm, T = LAB.fmT; if (!m || !T) return; const v = near(px, py);
+    if (v) { m.sel = v.k; drag = { type: "v", k: v.k, i: v.i }; }
+    else { const [x, z] = T.inv(px, py), k = m.bodies.findIndex(b => inside(b, x, z)); if (k < 0) return; m.sel = k; drag = { type: "b", k, x, z }; }
+    cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; paintForward(); };
+  cv.onpointermove = e => { if (!drag) return; const [px, py] = pos(e), T = LAB.fmT, b = LAB.ui.fm.bodies[drag.k]; if (!T || !b) return; const [x, z] = T.inv(px, py);
+    if (drag.type === "v") b.xy[drag.i] = [x, clampZ(z)];
+    else { let dz = z - drag.z; const zs = b.xy.map(p => p[1]); dz = Math.max(-Math.min(...zs), Math.min(LAB.ui.fm.zmax - Math.max(...zs), dz)); b.xy = b.xy.map(([a, c]) => [a + x - drag.x, c + dz]); drag.x = x; drag.z += dz; }
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(paintForward); };
+  cv.onpointerup = cv.onpointercancel = () => { drag = null; cv.style.cursor = "grab"; };
+  cv.ondblclick = e => { const [px, py] = pos(e), m = LAB.ui.fm, T = LAB.fmT; if (!m || !T) return; const v = near(px, py);
+    if (v) { const b = m.bodies[v.k]; if (b.xy.length > 3) b.xy.splice(v.i, 1); m.sel = v.k; paintForward(); return; }
+    const b = m.bodies[m.sel]; if (!b) return; let best = -1, bd = 14 * 14, at = null;
+    b.xy.forEach((p, i) => { const q = b.xy[(i + 1) % b.xy.length], ax = T.X(p[0]), az = T.Z(p[1]), bx = T.X(q[0]), bz = T.Z(q[1]), L2 = (bx - ax) ** 2 + (bz - az) ** 2 || 1, t = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - az) * (bz - az)) / L2)), d = (ax + t * (bx - ax) - px) ** 2 + (az + t * (bz - az) - py) ** 2; if (d < bd) { bd = d; best = i; at = T.inv(px, py); } });
+    if (best >= 0) { b.xy.splice(best + 1, 0, [at[0], clampZ(at[1])]); paintForward(); } };
+}
+
+/* ---------- 6.3 inversion ---------- */
+const ivDefaults = () => LAB.ui.iv || (LAB.ui.iv = { cw: 400, zmax: 6000, nz: 24, sigma: 0.3, beta: 1, z0: 500, ls: 0, lam: "auto", bodies: true });
+CH.push({ id: "6.3", sec: "model", short: "Inversion", title: "Inversion: let the data choose a density model",
+  tag: "The section is divided into rectangular cells and the density contrast of every cell is found by regularised least squares: fit the data to their error, with the smallest or smoothest model, weighted with depth.",
+  goal: "invert the section for density, choose the regularisation and see what the data can and cannot resolve.",
+  figs: [{ title: "Data fit and L-curve", sub: "λ balances data fit against model size. Auto picks the λ for which the misfit equals the data error (χ²/N = 1).",
+    html: () => `<canvas class="plot" id="iPr"></canvas><div class="row"><span class="hint" style="margin:0">λ</span>${segHTML("iAuto", [["auto", "Auto (χ²/N = 1)"], ["man", "Manual"]], ivDefaults().lam === "auto" ? "auto" : "man", "Lambda mode")}</div>
+      <div class="ctrls">${slider("iLam", "log₁₀ λ (relative)", -9, 3, 0.1, ivDefaults().lam === "auto" ? -3 : ivDefaults().lam, "", v => v.toFixed(1))}</div><canvas class="plot" id="iLc"></canvas><div class="kpis" id="iK"></div>`,
+    draw() { const v = ivDefaults(); bindSeg("iAuto", x => { v.lam = x === "auto" ? "auto" : +$("iLam").value; paintInversion(); }); bindSlider("iLam", "", x => { v.lam = x; $("iAuto").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "man")); paintInversion(); }, x => x.toFixed(1));
+      onPaint(paintInversion); } },
+    { title: "Density section", sub: "Density contrast of the cells (kg/m³). Dashed: the bodies of the forward model of 6.2 for comparison. The section extends beyond A and B by padding cells.",
+      html: () => { const v = ivDefaults();
+        return `<div class="mapwrap"><canvas class="plot" id="iSec"></canvas><div class="busy" id="iBusy" hidden>Computing the sensitivities…</div></div><canvas class="plot" id="iCb"></canvas>
+        <div class="ctrls">${slider("iSig", "Data error σ", 0.05, 1.5, 0.05, v.sigma, "mGal", x => x.toFixed(2))}${slider("iBeta", "Depth weighting β", 0, 2, 0.1, v.beta, "", x => x.toFixed(1))}${slider("iZ0", "Depth weighting z₀", 100, 3000, 100, v.z0, "m")}${slider("iLs", "Smoothness length", 0, 3000, 100, v.ls, "m")}${slider("iCw", "Cell width", 200, 1500, 50, v.cw, "m")}${slider("iZm", "Depth of the mesh", 2000, 15000, 500, v.zmax, "m")}</div>
+        <div class="row">${chk("iBod", "Show the forward-model bodies", v.bodies)}<button class="tbtn" type="button" id="iCsv">Model (CSV)</button><span class="hint" id="iMsg"></span></div>`; },
+      draw() { const v = ivDefaults(), re = () => { LAB.invP = null; paintInversion(); };
+        bindSlider("iSig", "mGal", x => { v.sigma = x; re(); }, x => x.toFixed(2)); bindSlider("iBeta", "", x => { v.beta = x; re(); }, x => x.toFixed(1)); bindSlider("iZ0", "m", x => { v.z0 = x; re(); });
+        bindSlider("iLs", "m", x => { v.ls = x; re(); }); bindSlider("iCw", "m", x => { v.cw = x; re(); }); bindSlider("iZm", "m", x => { v.zmax = x; re(); });
+        bindChk("iBod", x => { v.bodies = x; paintInversion(); });
+        $("iCsv").onclick = () => { const I = LAB.invR; if (!I) return; const M = I.P.M, out = [`# Wadi Ghadir Gravity Lab, written by ${AUTHOR}. 2-D density inversion of the section; λ(rel) ${I.s.rel.toExponential(2)}, χ²/N ${I.s.chi2n.toFixed(2)}.`, "distance_m,depth_m,drho_kgm3"];
+          for (let iz = 0; iz < M.nz; iz++) for (let ix = 0; ix < M.nx; ix++) out.push([((M.xe[ix] + M.xe[ix + 1]) / 2).toFixed(1), ((M.ze[iz] + M.ze[iz + 1]) / 2).toFixed(1), I.s.m[iz * M.nx + ix].toFixed(2)].join(","));
+          saveFile("wadi_ghadir_inversion_model.csv", out.join("\n"), "text/csv"); }; } }],
+  ideas: [["grid", "Many cells, few data", "There are far more cells than data: infinitely many models fit. Regularisation picks the simplest one in a chosen sense."],
+    ["mountain", "Depth weighting", "Without it, all mass is put just below the surface, where cells are most sensitive. (1 + z/z₀)<sup>−β/2</sup> with β ≈ 1 balances the 2-D kernels."],
+    ["wave", "Smallest or smoothest", "Smoothness length 0 gives the smallest model; a length of 1–2 km spreads the mass into smooth, broad bodies (like pyGIMLi with cType 1)."],
+    ["target", "Discrepancy principle", "Fitting the data better than their error (χ²/N < 1) only fits noise and creates artefacts."]],
+  eqs: [EQ("Φ = Σ((Gm − d)/σ)² + λ‖W R m‖²", "Objective function"), EQ("m = L<sup>−T</sup>Ĝ<sup>T</sup>(ĜĜ<sup>T</sup> + λI)<sup>−1</sup> d/σ", "Solution, RᵀR = LLᵀ, Ĝ = GL<sup>−T</sup>/σ"), EQ("w(z) = (1 + z/z₀)<sup>−β/2</sup>", "Depth weighting (Li & Oldenburg 1998)")],
+  tries: ["Set β to 0: where does the mass go?", "Increase the smoothness length to 1500 m and compare with the pyGIMLi section of 6.4.", "Lower σ to 0.05 mGal: what happens to the model with Auto λ?", "Turn on the forward-model bodies: does the inversion support your hypothesis?"],
+  notes: [NOTE("key", "pyGIMLi and SimPEG", "<p>Notebook 04 inverts the same kind of section with pyGIMLi (2-D) and the gridded residual with SimPEG (3-D). Chapter 6.4 shows both.</p>")],
+});
+function paintInversion() {
+  const pr = $("iPr"); if (!pr) return; const D = modelData();
+  if (!D) { noGrid("iK"); return; }
+  if (D.err) { plot(pr, { series: [], xlim: [0, 1], h: 140 }); $("iK").innerHTML = KPIT("Section", esc(D.err), "bad"); return; }
+  const v = ivDefaults(), key = [D.key, v.cw, v.zmax, v.nz, v.sigma, v.beta, v.z0, v.ls].join("|");
+  if (!LAB.invP || LAB.invP.key !== key) {
+    const b = $("iBusy"); if (b) b.hidden = false;
+    clearTimeout(LAB.invT); LAB.invT = setTimeout(() => {
+      try { const t = Date.now(), M = MOD.mesh(D.S.L, { cw: v.cw, zmax: v.zmax, nz: v.nz }); LAB.invP = { key, P: MOD.prepare(D.x, D.d, M, v), ms: Date.now() - t }; }
+      catch (e) { console.error(e); LAB.invP = null; $("iK").innerHTML = KPIT("Inversion failed", esc(e.message), "bad"); }
+      if (b) b.hidden = true; if (LAB.invP) paintInversion();
+    }, 30);
+    return;
+  }
+  const P = LAB.invP.P, rel = v.lam === "auto" ? MOD.autoLambda(P) : Math.pow(10, v.lam), s = MOD.solve(P, rel, true);
+  LAB.invR = { P, s }; if (v.lam === "auto" && $("iLam")) { $("iLam").value = Math.log10(rel).toFixed(1); $("iLamo").textContent = Math.log10(rel).toFixed(1) + " "; }
+  const xk = D.x.map(x => x / 1000), xl = secXlim(D.S).map(x => x / 1000);
+  plot(pr, { series: [{ name: "data", x: xk, y: D.d, color: css("--ink"), dots: true, r: 2.6, unit: "mGal", dec: 2, err: D.d.map(() => v.sigma) }, { name: "inversion", x: xk, y: s.pred, color: acc(), w: 2.6, unit: "mGal", dec: 2 }],
+    xlim: xl, ylabel: "mGal", xlabel: "distance from A [km]", xname: "km", xfmt: x => fmt(x, 1), h: 210 });
+  const lc = MOD.lcurve(P, Array.from({ length: 25 }, (_, i) => Math.pow(10, -9 + i * 0.5))).filter(q => q.chi2n > 1e-3);
+  plot($("iLc"), { series: [{ name: "L-curve", x: lc.map(q => 0.5 * Math.log10(q.phim + 1e-30)), y: lc.map(q => Math.log10(q.chi2n)), color: "#7f8a93", w: 1.6, dec: 2 }],
+    markers: [{ x: 0.5 * Math.log10(s.phim + 1e-30), y: Math.log10(s.chi2n), color: acc(), r: 6, label: "λ" }], hlines: [{ y: 0, label: "χ²/N = 1" }],
+    xlim: [Math.min(...lc.map(q => 0.5 * Math.log10(q.phim + 1e-30))) - 0.1, Math.max(...lc.map(q => 0.5 * Math.log10(q.phim + 1e-30))) + 0.1], xlabel: "log₁₀ ‖W R m‖ (model size)", ylabel: "log₁₀ χ²/N", xname: "log size", xfmt: x => fmt(x, 1), h: 210, nohover: true });
+  const M = P.M, mv = Array.from(s.m), sorted = mv.map(Math.abs).sort((a, b) => a - b), lim = Math.max(1, pctl(sorted, 0.98));
+  const sec = $("iSec"); if (sec) drawSection(sec, { xlim: secXlim(D.S), zmax: v.zmax, cells: { xe: M.xe, ze: M.ze, m: mv, lim }, bodies: v.bodies && LAB.ui.fm ? LAB.ui.fm.bodies : [], outline: true, h: Math.min(380, Math.max(240, sec.clientWidth * 0.42)) });
+  colorBar($("iCb"), "anom", -lim, lim, "kg/m³");
+  $("iK").innerHTML = KPI("χ²/N", fmt(s.chi2n, 2), Math.abs(s.chi2n - 1) < 0.15 ? "ok" : "hl") + KPI("rms misfit", fmt(s.rms, 3) + " <small>mGal</small>") + KPI("λ (relative)", s.rel.toExponential(1)) + KPI("Density", fmt(Math.min(...mv), 0) + " … " + fmt(Math.max(...mv), 0) + " <small>kg/m³</small>") + KPI("Cells × data", `${M.nc} × ${P.nd}`) + KPI("Set-up", LAB.invP.ms + " <small>ms</small>");
+}
+
+/* ---------- 6.4 pyGIMLi and SimPEG ---------- */
+const edgesOf = c => { const e = [c[0] - (c[1] - c[0]) / 2]; for (let i = 0; i < c.length - 1; i++) e.push((c[i] + c[i + 1]) / 2); e.push(c[c.length - 1] + (c[c.length - 1] - c[c.length - 2]) / 2); return e; };
+CH.push({ id: "6.4", sec: "model", short: "pyGIMLi and SimPEG", title: "The same section with pyGIMLi and SimPEG",
+  tag: "Notebook 04 models the residual along the section A–B with two open-source inversion frameworks: pyGIMLi in 2-D and SimPEG in 3-D. Their results are embedded here for comparison with your models.",
+  goal: "compare the forward model, the 2-D and the 3-D inversion of the same anomaly.",
+  figs: [{ title: "Data and responses along A–B", sub: "Wadi Ghadir residual (complete Bouguer, ρ = 2.67, minus the 3 km upward continuation), mean removed.",
+    html: () => PYM ? `<canvas class="plot" id="pPr"></canvas><div class="kpis" id="pK"></div><div class="row"><button class="tbtn go" type="button" id="pUse">Use this section in 6.1–6.3</button><span class="hint" id="pMsg"></span></div>` : `<p class="hint">The pyGIMLi and SimPEG results were not available when this lab was built. Run notebook 04 and rebuild the lab.</p>`,
+    draw() { if (!PYM) return; const xk = PYM.x.map(v => v / 1000), xl = [-0.03 * PYM.L / 1000, 1.03 * PYM.L / 1000], S = PYM.summary;
+      plot($("pPr"), { series: [{ name: "data", x: xk, y: PYM.data, color: css("--ink"), dots: true, r: 2.6, unit: "mGal", dec: 2 }, { name: "forward (polygons)", x: xk, y: PYM.fwd, color: "#8a5bd6", w: 1.6, dash: [6, 4], unit: "mGal", dec: 2 }, { name: "pyGIMLi 2-D", x: xk, y: PYM.pg, color: acc(), w: 2.4, unit: "mGal", dec: 2 }, { name: "SimPEG 3-D", x: xk, y: PYM.sp, color: "#1baf7a", w: 2.2, dash: [3, 2], unit: "mGal", dec: 2 }],
+        xlim: xl, ylabel: "mGal", xlabel: "distance from A [km]", xname: "km", xfmt: v => fmt(v, 1), h: 240 });
+      $("pK").innerHTML = KPI("pyGIMLi rms", fmt(S.pygimli.rms_mGal, 2) + " <small>mGal</small>", "hl") + KPI("pyGIMLi χ²", fmt(S.pygimli.chi2, 2)) + KPI("SimPEG rms", fmt(S.simpeg.rms_mGal, 3) + " <small>mGal</small>") + KPI("SimPEG cells", S.simpeg.cells.toLocaleString("en-US")) + KPI("Forward rms", fmt(S.forward.rms_mGal, 2) + " <small>mGal</small>");
+      $("pUse").onclick = () => { const s = sDefaults(); s.A = [PYM.A[1], PYM.A[0]]; s.B = [PYM.B[1], PYM.B[0]]; s.field = "filter"; const f = fDefaults(); f.type = "residual"; f.up = 3000; LAB.ui.fm = null; $("pMsg").textContent = "Section, field and starting bodies set: open 6.1–6.3."; }; } },
+    { title: "Density sections", sub: "Top: pyGIMLi 2-D inversion (depth-weighted, λ from the discrepancy principle). Bottom: SimPEG 3-D inversion cut along A–B. Same colour scale; dashed: the polygons of the forward model.",
+      html: () => PYM ? `<canvas class="plot" id="pPg"></canvas><canvas class="plot" id="pSp"></canvas><canvas class="plot" id="pCb"></canvas>` : "",
+      draw() { if (!PYM) return; const xl = [-0.03 * PYM.L, 1.03 * PYM.L], all = PYM.pgm.v.flat().concat(PYM.spm.v.flat()).filter(isF).map(Math.abs).sort((a, b) => a - b), lim = Math.max(1, pctl(all, 0.98));
+        const bodies = PYM.bodies.map(b => ({ drho: b.drho, xy: b.xy.map(([x, z]) => [x * 1000, z * 1000]) })), h = cv => Math.min(320, Math.max(200, cv.clientWidth * 0.34));
+        [["pPg", PYM.pgm, "pyGIMLi 2-D"], ["pSp", PYM.spm, "SimPEG 3-D"]].forEach(([id, g, lab]) => drawSection($(id), { xlim: xl, zmax: 5000, cells: { xe: edgesOf(g.x), ze: edgesOf(g.z), m: g.v.flat(), lim }, bodies, outline: true, label: lab, h: h($(id)) }));
+        colorBar($("pCb"), "anom", -lim, lim, "kg/m³"); } },
+    { title: "The code", sub: "The essential calls of notebook 04 (open it for every step, with editable parameters).",
+      html: () => `<pre class="code" style="white-space:pre;overflow-x:auto;font-size:12.5px"># pyGIMLi: 2-D section, smallest model with depth weighting
+fop = GravityModelling2D(points=sensors, mesh=pg.createGrid(x_edges, -z_edges[::-1]))
+inv = pg.Inversion(fop=fop)
+inv.setRegularization(cType=0, trans="lin")
+inv.modelTrans = pg.trans.Trans(); inv.dataTrans = pg.trans.Trans()
+inv.setConstraintWeights(depthWeighting(mesh, z0=500, power=0.5, cell=True))
+rho = inv.run(d_obs, absoluteError=0.3, lam=lam, startModel=0.0)
+
+# SimPEG: 3-D inversion of the gridded residual
+sim = gravity.simulation.Simulation3DIntegral(survey=survey, mesh=mesh3d, rhoMap=maps.IdentityMap(nP=n),
+                                               engine="choclo", store_sensitivities="ram")
+reg = regularization.WeightedLeastSquares(mesh3d)
+opt = optimization.ProjectedGNCG(maxIter=15, lower=-1.0, upper=1.0)
+dirs = [directives.UpdateSensitivityWeights(), directives.BetaEstimate_ByEig(beta0_ratio=10),
+        directives.BetaSchedule(coolingFactor=5, coolingRate=1), directives.TargetMisfit(chifact=1)]
+rho3d = inversion.BaseInversion(inverse_problem.BaseInvProblem(dmis, reg, opt), directiveList=dirs).run(m0)</pre>`,
+      draw() {} }],
+  ideas: [["layers", "pyGIMLi", "Geophysical Inversion and Modelling Library (Rücker et al. 2017): finite-element meshes, forward operators and a generic Gauss–Newton inversion."],
+    ["cube", "SimPEG", "Simulation and Parameter Estimation in Geophysics (Cockett et al. 2015): the 3-D integral gravity simulation with Choclo kernels and Li–Oldenburg sensitivity weighting."],
+    ["scale", "2-D against 3-D", "The 2-D inversion sees only the profile and assumes infinite strike. The 3-D inversion fits the whole map, so bodies of finite length and the anomalies beside the line shape its section."]],
+  notes: [NOTE("key", "Files", "<p><code>outputs/modelling/</code>: section_profile.csv, pygimli_section_model.csv, simpeg_section_model.csv, simpeg_3d_model.npz and section_models.png.</p>")],
+});
+
+/* ---------- 7.1 validation ---------- */
+CH.push({ id: "7.1", sec: "out", short: "Check against Python", title: "Check against the Python processing chain",
   tag: "This lab is a port of the wghadir Python chain. For the Wadi Ghadir data with the default parameters, both must give the same anomalies.",
   goal: "verify that the browser chain reproduces the delivered products.",
   figs: [{ title: "Browser against Python", sub: "Complete Bouguer anomaly (ρ = 2.67 g/cm³) of every station. Differences appear when you change parameters.",
@@ -635,8 +1019,8 @@ function paintValid() {
   $("vK").innerHTML = KPI("Stations compared", pr.length) + KPI("Median |difference|", fmt(1000 * ENG.median(a), 3) + " <small>µGal</small>", "ok") + KPI("Within 1 µGal", a.filter(v => v < 0.001).length) + KPI("Largest", fmt(1000 * a[a.length - 1], 1) + " <small>µGal</small>", a[a.length - 1] > 0.01 ? "bad" : "ok") + KPIT("Note", "One station was occupied twice on one day; the Python table keeps the other occupation.");
 }
 
-/* ---------- 6.2 export ---------- */
-CH.push({ id: "6.2", sec: "out", short: "Export and parameters", title: "Export the results and the parameters",
+/* ---------- 7.2 export ---------- */
+CH.push({ id: "7.2", sec: "out", short: "Export and parameters", title: "Export the results and the parameters",
   tag: "Take the station table, the grid, the map and your parameter set with you. A parameter set pasted back here reproduces the run.",
   goal: "save the results of your run and the settings that produced them.",
   figs: [
@@ -650,7 +1034,7 @@ CH.push({ id: "6.2", sec: "out", short: "Export and parameters", title: "Export 
         $("pA").onclick = () => { try { const j = JSON.parse($("pJ").value); delete j.written_by; LAB.P = ENG.mergeParams(j); changed(); $("pM").textContent = "Applied."; } catch (e) { $("pM").textContent = "This is not valid JSON: " + e.message; } };
         $("pC").onclick = () => copyText($("pJ").value, $("pM")); $("pD").onclick = () => { LAB.P = ENG.mergeParams({}); $("pJ").value = JSON.stringify(P(), null, 1); changed(); $("pM").textContent = "Defaults restored."; }; } },
     { title: "Software and sources", sub: "",
-      html: () => `<ul class="refs"><li>Processing chain: <i>wghadir</i> Python package (this project), ported to JavaScript for this lab; Python notebooks 01–03 run the same steps with Harmonica, Verde, Boule, Choclo (Fatiando a Terra), pygtide/ETERNA, SGTool and PyGMT.</li><li>Physics core and page design: <i>Static Gravity Lab</i> by Mohamed Sobh, LIAG.</li><li>Longman, I. M. (1959). Formulas for computing the tidal accelerations due to the Moon and the Sun. <i>JGR</i> 64.</li><li>Hinze, W. J. et al. (2005). New standards for reducing gravity data. <i>Geophysics</i> 70.</li><li>Nettleton, L. L. (1939). Determination of density for reduction of gravimeter observations. <i>Geophysics</i> 4.</li><li>Sandwell, D. T. (1987). Biharmonic spline interpolation of GEOS-3 and SEASAT altimeter data. <i>GRL</i> 14.</li><li>Copernicus DEM GLO-30 © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA.</li></ul>`,
+      html: () => `<ul class="refs"><li>Processing chain: <i>wghadir</i> Python package (this project), ported to JavaScript for this lab; Python notebooks 01–03 run the same steps with Harmonica, Verde, Boule, Choclo (Fatiando a Terra), pygtide/ETERNA, SGTool and PyGMT; notebook 04 models the section with pyGIMLi and SimPEG.</li><li>Physics core and page design: <i>Static Gravity Lab</i> by Mohamed Sobh, LIAG.</li><li>Longman, I. M. (1959). Formulas for computing the tidal accelerations due to the Moon and the Sun. <i>JGR</i> 64.</li><li>Hinze, W. J. et al. (2005). New standards for reducing gravity data. <i>Geophysics</i> 70.</li><li>Nettleton, L. L. (1939). Determination of density for reduction of gravimeter observations. <i>Geophysics</i> 4.</li><li>Talwani, M., Worzel, J. L. &amp; Landisman, M. (1959). Rapid gravity computations for two-dimensional bodies. <i>JGR</i> 64.</li><li>Spector, A. &amp; Grant, F. S. (1970). Statistical models for interpreting aeromagnetic data. <i>Geophysics</i> 35.</li><li>Li, Y. &amp; Oldenburg, D. W. (1998). 3-D inversion of gravity data. <i>Geophysics</i> 63.</li><li>Rücker, C., Günther, T. &amp; Wagner, F. M. (2017). pyGIMLi. <i>Computers &amp; Geosciences</i> 109. Cockett, R. et al. (2015). SimPEG. <i>Computers &amp; Geosciences</i> 85.</li><li>Sandwell, D. T. (1987). Biharmonic spline interpolation of GEOS-3 and SEASAT altimeter data. <i>GRL</i> 14.</li><li>Copernicus DEM GLO-30 © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA.</li></ul>`,
       draw() {} },
   ],
   ideas: [["check", "Reproducible", "The parameter set and the input files fully define a run. Keep them with the results."],
@@ -665,9 +1049,10 @@ function stationCSV() {
   const rho = P().red.rho, head = ["key", "instrument", "date", "line", "station", "lat", "lon", "H_m", "dH_m", "dg100_mGal", "sigma_mGal", "scale_k", "drift_mode", "FA_mGal", `SB_${rho.toFixed(2)}_mGal`, `CB_${rho.toFixed(2)}_mGal`, "u_topo"];
   return [`# Wadi Ghadir Gravity Lab, written by ${AUTHOR}. Data: ${LAB.input.name}. Values relative to the base station.`, head.join(",")].concat(okSt().map(s => [s.key, s.inst, s.date, s.line, s.station, s.lat.toFixed(7), s.lon.toFixed(7), s.H.toFixed(3), s.dh.toFixed(3), s.dgk.toFixed(4), s.dgs.toFixed(4), s.k.toFixed(6), s.drift, s.dFA.toFixed(4), ENG.SB(s, rho).toFixed(4), isF(s.uTopo) ? ENG.CB(s, rho).toFixed(4) : "", isF(s.uTopo) ? s.uTopo.toFixed(5) : ""].join(","))).join("\n");
 }
-function gridCSV() {
-  const G = LAB.grid; if (!G) return null; const out = [`# Wadi Ghadir Gravity Lab, written by ${AUTHOR}. Grid of ${QTY[G.q][0]}${G.q === "SB" || G.q === "CB" ? ", rho " + P().red.rho.toFixed(2) : ""} [mGal].`, "lon,lat,x_local_m,y_local_m,value"];
-  for (let r = 0; r < G.ny; r++) for (let c = 0; c < G.nx; c++) { const i = r * G.nx + c; if (!G.mask[i]) continue; const x = G.x0 + c * G.cell, y = G.y0 + r * G.cell, [la, lo] = G.local.inv(x, y); out.push([lo.toFixed(6), la.toFixed(6), x.toFixed(1), y.toFixed(1), G.z[i].toFixed(4)].join(",")); }
+function gridCSV(z, label) {
+  const G = LAB.grid; if (!G) return null; z = z || G.z;
+  const out = [`# Wadi Ghadir Gravity Lab, written by ${AUTHOR}. Grid of ${label || QTY[G.q][0] + (G.q === "SB" || G.q === "CB" ? ", rho " + P().red.rho.toFixed(2) : "") + " [mGal]"}.`, "lon,lat,x_local_m,y_local_m,value"];
+  for (let r = 0; r < G.ny; r++) for (let c = 0; c < G.nx; c++) { const i = r * G.nx + c; if (!G.mask[i]) continue; const x = G.x0 + c * G.cell, y = G.y0 + r * G.cell, [la, lo] = G.local.inv(x, y); out.push([lo.toFixed(6), la.toFixed(6), x.toFixed(1), y.toFixed(1), z[i].toFixed(4)].join(",")); }
   return out.join("\n");
 }
 /* save a file: through the artifact viewer's downloads capability when the lab runs in claude.ai,
@@ -731,7 +1116,7 @@ function themeToggle() {
 CH.forEach(c => { const d0 = c.figs[0].draw; c.figs[0].draw = function () { LAB.paint = []; d0.call(this); }; });
 compute(); updateBadge();
 const app = makeApp({ chapters: CH, store: "wadi-ghadir-lab", heroInit, heroSize,
-  sections: [["start", "The survey", "globe"], ["data", "Data", "layers"], ["corr", "Corrections", "clock"], ["red", "Reduction", "mountain"], ["maps", "Maps", "map"], ["out", "Results", "check"]] });
+  sections: [["start", "The survey", "globe"], ["data", "Data", "layers"], ["corr", "Corrections", "clock"], ["red", "Reduction", "mountain"], ["maps", "Maps", "map"], ["model", "Modelling", "cube"], ["out", "Results", "check"]] });
 themeToggle();
 document.getElementById("heroSave").addEventListener("click", () => saveFile("Wadi_Ghadir_Gravity_Lab.html", PAGE_HTML, "text/html"));
 document.getElementById("heroOwn").addEventListener("click", () => setTimeout(() => { const f = $("fDat"); if (f) f.focus(); }, 600));

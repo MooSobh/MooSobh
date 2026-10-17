@@ -148,6 +148,9 @@ def chains_package(out_dir):
     shutil.copytree(os.path.join(ROOT, "outputs", "deliverables"), os.path.join(pkg, "reference_results"))
     for f in ("summary.json", "magnetics_summary.json"):
         shutil.copy2(os.path.join(ROOT, "outputs", f), os.path.join(pkg, "reference_results"))
+    # section models of notebook 04 (pyGIMLi, SimPEG); notebook 04 itself starts from the grids of notebook 03
+    if os.path.isdir(os.path.join(ROOT, "outputs", "modelling")):
+        shutil.copytree(os.path.join(ROOT, "outputs", "modelling"), os.path.join(pkg, "reference_results", "modelling"))
     zpath = shutil.make_archive(pkg, "zip", out_dir, CHAINS_NAME)
     print(f"chains package: {zpath} ({os.path.getsize(zpath) / 2 ** 20:.1f} MiB)")
     return zpath

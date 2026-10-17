@@ -152,3 +152,31 @@ console.log(JSON.stringify(Object.fromEntries(ok.map(s=>[s.key, E.CB(s,2.67)])))
     assert len(common) > 500
     d = np.abs(np.array([cb[k] for k in common]) - py.loc[common, "dCB_rel_rho2.67_mgal"].values)
     assert np.max(d) < 0.002          # mGal
+
+
+def test_web_lab_modelling_engine():
+    """web/src/model.js: Talwani polygon = line mass far away; the 2-D inversion puts a buried block where it is."""
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("needs Node.js")
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    js = f"""
+const fs=require('fs'); eval(fs.readFileSync({json.dumps(os.path.join(root, 'web', 'src', 'gl_core.js'))},'utf8').replace('const GL=','global.GL='));
+const M=require({json.dumps(os.path.join(root, 'web', 'src', 'model.js'))});
+const sq={{xy:[[-50,950],[-50,1050],[50,1050],[50,950]],drho:100}};      // counter-clockwise on purpose
+const g=M.bodyResponse([0,1000],sq), line=[0,1000].map(x=>2*6.6743e-11*100*1e4*1000/(x*x+1e6)*1e5);
+const x=Array.from({{length:81}},(_,i)=>i*250), blk=[{{xy:[[8000,800],[12000,800],[12000,2000],[8000,2000]],drho:200}}];
+const d=M.forward(x,blk), Ms=M.mesh(20000,{{cw:400,zmax:6000,nz:24}}), P=M.prepare(x,d,Ms,{{sigma:0.05,z0:500,beta:1,ls:500}});
+const s=M.solve(P,M.autoLambda(P),true); let jb=0; s.m.forEach((v,j)=>{{if(v>s.m[jb])jb=j;}});
+console.log(JSON.stringify({{g,line,chi2n:s.chi2n,x:(Ms.xe[jb%Ms.nx]+Ms.xe[jb%Ms.nx+1])/2,z:(Ms.ze[Math.floor(jb/Ms.nx)]+Ms.ze[Math.floor(jb/Ms.nx)+1])/2,
+  fit:M.fitDensities(x,d,[{{xy:blk[0].xy,drho:1}}])[0]}}));
+"""
+    r = json.loads(subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout)
+    assert np.allclose(r["g"], r["line"], rtol=1e-4)
+    assert abs(r["chi2n"] - 1) < 0.01
+    assert 9000 < r["x"] < 11000 and 600 < r["z"] < 2400
+    assert abs(r["fit"] - 200) < 1e-6

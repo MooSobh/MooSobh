@@ -9,7 +9,8 @@ raw CG-6 files.  This script embeds the Wadi Ghadir example data:
   and the unit topographic effect of the Copernicus DEM, relative to base 100);
 * the base-100 and hotel reference marks;
 * the Python results (free-air and complete Bouguer, 2.67) for the validation chapter;
-* a hillshade of the Copernicus GLO-30 DEM for the map background.
+* a hillshade of the Copernicus GLO-30 DEM for the map background;
+* the pyGIMLi and SimPEG section models of notebook 04 (outputs/modelling), when present.
 
 Run after the gravity chain (outputs/tables/15 and 16 must exist):
     python scripts/build_gravity_lab.py
@@ -82,6 +83,30 @@ def hillshade_png(dem_path, width=1100):
             "lon0": float(lons[0]), "lon1": float(lons[-1]), "lat0": float(lats[-1]), "lat1": float(lats[0])}
 
 
+def model_results(outputs):
+    """Section A-B of notebook 04: profile, responses and the pyGIMLi and SimPEG sections (None if not run)."""
+    d = os.path.join(outputs, "modelling")
+    files = ["summary.json", "section_profile.csv", "pygimli_section_model.csv", "simpeg_section_model.csv"]
+    if not all(os.path.exists(os.path.join(d, f)) for f in files):
+        return None
+    summ = json.load(open(os.path.join(d, "summary.json")))
+    prof = pd.read_csv(os.path.join(d, "section_profile.csv"), comment="#")
+    L = summ["length_m"]
+
+    def matrix(name):
+        m = pd.read_csv(os.path.join(d, name))
+        m = m[(m["depth_m"] <= 5200) & (m["distance_m"] >= -0.06 * L) & (m["distance_m"] <= 1.06 * L)]
+        t = m.pivot_table(index="depth_m", columns="distance_m", values="density_kgm3")
+        return {"x": [round(v, 1) for v in t.columns], "z": [round(v, 1) for v in t.index],
+                "v": [[r(v, 1) for v in row] for row in t.values]}
+
+    col = lambda c: [r(v, 4) for v in prof[c]]  # noqa: E731
+    return {"A": summ["A_lonlat"], "B": summ["B_lonlat"], "L": L, "summary": summ, "bodies": summ["forward"]["bodies"],
+            "x": [round(v, 1) for v in prof["distance_m"]], "data": col("data_mGal"), "pg": col("pygimli_response_mGal"),
+            "sp": col("simpeg_response_mGal"), "fwd": col("forward_model_mGal"),
+            "pgm": matrix("pygimli_section_model.csv"), "spm": matrix("simpeg_section_model.csv")}
+
+
 def build(raw, tables, external):
     summary = json.load(open(os.path.join(os.path.dirname(tables), "summary.json")))
     b, h = summary["ref"]["base_100"], summary["ref"]["hotel_0"]
@@ -98,6 +123,7 @@ def build(raw, tables, external):
                 "hotel": {"lat": h["lat"], "lon": h["lon"]}},
         "python": python_reference(tables),
         "hillshade": hillshade_png(os.path.join(external, "copernicus_glo30_wadi_ghadir.tif")),
+        "model": model_results(os.path.dirname(tables)),
     }
 
 
@@ -131,7 +157,7 @@ def assemble(data):
     read = lambda f: open(os.path.join(SRC, f), encoding="utf-8").read()  # noqa: E731
     body = read("lab_body.html")
     page = (body.replace("/*@@CSS@@*/", read("base.css") + "\n" + read("lab.css"))
-                .replace("/*@@JS@@*/", "\n".join([read("gl_core.js"), read("ui_core.js"), read("engine.js"),
+                .replace("/*@@JS@@*/", "\n".join([read("gl_core.js"), read("ui_core.js"), read("engine.js"), read("model.js"),
                                                   "const WG_DATA = " + json.dumps(data, separators=(",", ":")).replace("</", "<\\/") + ";",
                                                   read("lab.js")])))
     return page

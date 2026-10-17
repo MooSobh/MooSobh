@@ -41,3 +41,4 @@ table.t td,table.t th{white-space:nowrap}
 .small{font-size:14px}
 .pnum{font-family:var(--mono);font-size:13px}
 #themeBtn{margin-left:auto}
+.mapov{position:absolute;left:0;top:0;width:100%;pointer-events:none}
