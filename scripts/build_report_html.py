@@ -3,6 +3,9 @@
 
 Example:
     python scripts/build_report_html.py
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import base64
 import io

@@ -1,4 +1,8 @@
-"""GNSS point workbooks (DMS text) and KML exports."""
+"""GNSS point workbooks (DMS text) and KML exports.
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
+"""
 import datetime as dt
 import re
 import xml.etree.ElementTree as ET
@@ -66,6 +70,7 @@ def read_point_workbook(path, source_label):
 
 
 def read_kml(path, source_label):
+    """Read the point placemarks (name, lon, lat, height) of a KML file."""
     ns = {"k": "http://www.opengis.net/kml/2.2"}
     root = ET.parse(path).getroot()
     out = []
@@ -85,6 +90,7 @@ def read_kml(path, source_label):
 
 
 def haversine_m(lat1, lon1, lat2, lon2):
+    """Great-circle distance in metres between (lat1, lon1) and (lat2, lon2) in degrees."""
     r = 6371008.8
     p1, p2 = np.radians(lat1), np.radians(lat2)
     dphi = p2 - p1

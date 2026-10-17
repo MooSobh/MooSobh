@@ -1,3 +1,7 @@
+"""pytest configuration: make the wghadir package importable from the repository root.
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+"""
 import os
 import sys
 

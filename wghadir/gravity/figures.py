@@ -1,4 +1,8 @@
-"""Publication figures.  Each function writes one PNG (300 dpi) into fdir."""
+"""Publication figures.  Each function writes one PNG (300 dpi) into fdir.
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
+"""
 import os
 
 import matplotlib
@@ -8,7 +12,9 @@ import matplotlib.dates as mdates  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
+
+from ..common.mapping import MAP_STYLE  # noqa: E402
 
 # reference categorical palette (fixed order) and status colour
 C = {"CG6-0640": "#2a78d6", "CG6-0313": "#eb6834", "third": "#1baf7a", "violet": "#4a3aa7",
@@ -17,13 +23,25 @@ LABEL = {"CG6-0640": "CG-6 #0640 (new)", "CG6-0313": "CG-6 #0313 (old)"}
 DIVERGING = LinearSegmentedColormap.from_list(
     "bluegrayred", ["#104281", "#2a78d6", "#9ec5f4", "#f0efec", "#f4a3a2", "#e34948", "#8f1d1c"])
 
-plt.rcParams.update({
+# Style of the QC figures and Nettleton sheets: these settings, then the shared map typography
+# (MAP_STYLE), but open axes without top/right spines.  Applied by apply_qc_style().
+QC_STYLE = {
     "font.size": 9, "axes.titlesize": 10, "axes.labelsize": 9, "legend.fontsize": 8,
     "axes.edgecolor": C["ink2"], "axes.labelcolor": C["ink"], "xtick.color": C["ink2"], "ytick.color": C["ink2"],
     "axes.grid": True, "grid.color": C["grid"], "grid.linewidth": 0.5, "axes.spines.top": False,
     "axes.spines.right": False, "figure.dpi": 110, "savefig.dpi": 300, "savefig.bbox": "tight",
     "lines.linewidth": 1.2, "legend.frameon": False,
-})
+}
+
+
+QC_KEEP = ("axes.spines.top", "axes.spines.right", "axes.labelcolor")
+
+
+def apply_qc_style():
+    """Matplotlib defaults + QC_STYLE + the shared map typography (except the keys in QC_KEEP)."""
+    plt.rcdefaults()
+    plt.rcParams.update(QC_STYLE)
+    plt.rcParams.update({k: v for k, v in MAP_STYLE.items() if k not in QC_KEEP})
 
 
 def _save(fig, fdir, name):
@@ -38,7 +56,8 @@ def _lonlat_aspect(ax, lat=24.77):
 
 
 def fig_map(ctx, fdir):
-    occ, P = ctx["occ"], ctx["P"]
+    """QC figure fig01_coverage_map.png."""
+    occ = ctx["occ"]
     fig, ax = plt.subplots(figsize=(7.2, 6.0))
     f = occ[occ["role"] == "field"]
     for inst in ("CG6-0640", "CG6-0313"):
@@ -59,6 +78,7 @@ def fig_map(ctx, fdir):
 
 
 def fig_tide(ctx, fdir):
+    """QC figure fig02_tide_check.png."""
     df = ctx["df"]
     fig, axes = plt.subplots(2, 1, figsize=(7.2, 5.6), sharex=True, gridspec_kw=dict(hspace=0.35))
     d = df[(df["instrument"] == "CG6-0313")]
@@ -81,6 +101,7 @@ def fig_tide(ctx, fdir):
 
 
 def fig_corrections(ctx, fdir):
+    """QC figure fig03_correction_terms.png."""
     df = ctx["df"]
     fig, axes = plt.subplots(4, 2, figsize=(7.2, 7.6), sharex="col")
     terms = [("TideCorr", "Tide [mGal]"), ("TiltCorr", "Tilt corr. [mGal]"), ("TempCorr", "Temperature corr. [mGal]"),
@@ -105,6 +126,7 @@ def fig_corrections(ctx, fdir):
 
 
 def fig_timeseries(ctx, fdir):
+    """QC figure fig04_reading_timeseries.png."""
     df = ctx["df"]
     fig, axes = plt.subplots(2, 1, figsize=(7.2, 5.8), sharex=True)
     for ax, inst in zip(axes, ("CG6-0640", "CG6-0313")):
@@ -127,6 +149,7 @@ def fig_timeseries(ctx, fdir):
 
 
 def fig_qc(ctx, fdir):
+    """QC figure fig05_qc_stddev_tilt.png."""
     df = ctx["df"]
     from .qc import THRESHOLDS as TH
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.3))
@@ -161,6 +184,7 @@ def fig_qc(ctx, fdir):
 
 
 def fig_base100(ctx, fdir):
+    """QC figure fig06_base100_daily.png."""
     occ, ctrl = ctx["occ"], ctx["ctrl"]
     dates = sorted(occ["date"].unique())
     fig, axes = plt.subplots(len(dates), 2, figsize=(7.2, 1.15 * len(dates) + 0.8), sharex=False)
@@ -208,6 +232,7 @@ def fig_base100(ctx, fdir):
 
 
 def fig_ties(ctx, fdir):
+    """QC figure fig07_ties_and_closures.png."""
     ties, closures = ctx["ties"], ctx["closures"]
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
     ax = axes[0]
@@ -234,6 +259,7 @@ def fig_ties(ctx, fdir):
 
 
 def fig_instruments(ctx, fdir):
+    """QC figure fig08_instrument_comparison.png."""
     pairs, sc = ctx["pairs"], ctx["sc"]
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.3))
     ax = axes[0]
@@ -264,6 +290,7 @@ def fig_instruments(ctx, fdir):
 
 
 def fig_gnss(ctx, fdir):
+    """QC figure fig09_gnss_checks.png."""
     dm, occ = ctx["datum_marks"], ctx["occ"]
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
     ax = axes[0]
@@ -287,93 +314,11 @@ def fig_gnss(ctx, fdir):
     _save(fig, fdir, "fig09_gnss_checks.png")
 
 
-def fig_anomaly_maps(ctx, fdir):
-    st = ctx["st"]
-    s = st[st["product_ok"]]
-    fig, axes = plt.subplots(1, 3, figsize=(7.4, 2.55), sharey=True, layout="constrained")
-    for ax, (col, title) in zip(axes, (("dh_m", "Height rel. base 100 [m]"),
-                                       ("dFA_rel_mgal", "ΔFA rel. base 100 [mGal]"),
-                                       ("dSB_rel_rho2.67_mgal", "ΔSB (2.67) rel. base 100 [mGal]"))):
-        v = s[col]
-        if col == "dh_m":
-            sc_ = ax.scatter(s["lon"], s["lat"], c=v, s=6, cmap="cividis", lw=0)
-        else:
-            lim = np.nanpercentile(np.abs(v), 98)
-            sc_ = ax.scatter(s["lon"], s["lat"], c=v, s=6, cmap=DIVERGING, norm=TwoSlopeNorm(0, -lim, lim), lw=0)
-        cb = fig.colorbar(sc_, ax=ax, orientation="horizontal", pad=0.02, shrink=0.9)
-        cb.ax.tick_params(labelsize=7)
-        cb.set_label(title, fontsize=8)
-        _lonlat_aspect(ax)
-        ax.tick_params(labelsize=7)
-        if ax is not axes[0]:
-            ax.set_ylabel("")
-    fig.suptitle("Base-relative products – provisional (no terrain correction, no absolute datum)", fontsize=9)
-    _save(fig, fdir, "fig10_relative_anomaly_maps.png")
-
-
-def fig_nettleton(ctx, fdir):
-    sweeps, net, prof, win = ctx["sweeps"], ctx["net"], ctx["prof"], ctx["win"]
-    # (a) correlation vs density for every eligible profile
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.4))
-    ax = axes[0]
-    for pid, d in sweeps.groupby("profile_id"):
-        col = C["CG6-0640"] if pid.startswith("N") else C["CG6-0313"]
-        ax.plot(d["rho"], d["corr_detrended"], color=col, lw=0.9, alpha=0.8)
-    ax.axhline(0, color=C["ink2"], lw=0.6)
-    ax.axvline(2.67, color=C["ink2"], lw=0.6, ls="--")
-    ax.set_xlabel("Trial density ρ [g/cm³]")
-    ax.set_ylabel("corr(detrended ΔSB, detrended Δh)")
-    ax.set_title(f"Nettleton sweeps, {net['profile_id'].nunique()} profiles")
-    ax.plot([], [], color=C["CG6-0640"], label="#0640 traverses")
-    ax.plot([], [], color=C["CG6-0313"], label="#0313 lines")
-    ax.legend(loc="lower left")
-    ax = axes[1]
-    w = win[win["rho_se"] < 1.0].sort_values("rho_regression")
-    y = np.arange(len(w))
-    ax.errorbar(w["rho_regression"], y, xerr=1.96 * w["rho_se"], fmt="none", ecolor=C["grid"], capsize=0)
-    for inst in ("CG6-0640", "CG6-0313"):
-        m = w["instrument"].values == inst
-        ax.plot(w["rho_regression"].values[m], y[m], "o", ms=4, color=C[inst], label=LABEL[inst])
-    ax.axvspan(2.0, 3.0, color=C["grid"], alpha=0.35, lw=0)
-    ax.axvline(2.67, color=C["ink2"], lw=0.6, ls="--")
-    ax.set_xlim(-1, 7)
-    ax.set_yticks([])
-    ax.set_xlabel("Window density estimate ±1.96 SE [g/cm³]")
-    ax.set_title(f"3-km windows with SE < 1 g/cm³ (n = {len(w)})")
-    ax.legend(loc="lower right", fontsize=7)
-    fig.tight_layout()
-    _save(fig, fdir, "fig11_nettleton_summary.png")
-
-    # (b) anomaly vs topography for the profiles with the tightest estimates
-    best = net.sort_values("rho_regression_se").head(4)["profile_id"].tolist()
-    fig, axes = plt.subplots(2, len(best), figsize=(7.4, 4.4), sharex="col")
-    for j, pid in enumerate(best):
-        p = prof[prof["profile_id"] == pid].sort_values("chainage_m")
-        p = p[~p["drift_mode"].str.startswith("EXTRAP")]
-        x = p["chainage_m"] / 1000
-        ax = axes[0, j]
-        ax.plot(x, p["h_used"], color=C["ink2"], lw=1)
-        ax.set_title(pid, fontsize=8)
-        if j == 0:
-            ax.set_ylabel("Height [m]")
-        ax = axes[1, j]
-        for rho, col in ((2.2, C["third"]), (2.67, C["ink"]), (3.0, C["violet"])):
-            b = p["dFA_rel_mgal"] - 0.04193 * rho * p["dh_m"]
-            ax.plot(x, b - b.mean(), color=col, lw=1, label=f"ρ = {rho}")
-        ax.set_xlabel("Chainage [km]")
-        if j == 0:
-            ax.set_ylabel("ΔSB − mean [mGal]")
-        ax.tick_params(labelsize=7)
-    axes[1, 0].legend(loc="best", fontsize=7)
-    fig.suptitle("Topography and simple-Bouguer profiles for three trial densities (no terrain correction)", fontsize=9)
-    fig.tight_layout()
-    _save(fig, fdir, "fig12_nettleton_profiles.png")
-
-
 def make_all(ctx, fdir):
     """QC figures into fdir; maps, grids and Nettleton sheets into sibling folders."""
     from . import maps, nettleton_figs
 
+    apply_qc_style()
     for f in (fig_map, fig_tide, fig_corrections, fig_timeseries, fig_qc, fig_base100, fig_ties, fig_instruments,
               fig_gnss):
         f(ctx, fdir)

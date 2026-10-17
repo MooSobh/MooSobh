@@ -1,4 +1,4 @@
-"""Ground magnetic data of the Wadi Ghadir survey: QC, IGRF removal, maps and RTP.
+"""Ground magnetic processing: loading, QC, IGRF removal, gridding and RTP.
 
 Input: one workbook with columns lat, long, x, y, E, Reading, Time, Corrected data
 (Total Intensity); "Corrected data" is the diurnally corrected total field supplied
@@ -14,36 +14,24 @@ Chain
      blanked > MASK_KM from data
   7  reduction to the pole (Harmonica, FFT) assuming induced magnetisation along
      the IGRF field direction; tapered and padded grid to limit edge effects
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import datetime as dt
-import os
 
-import matplotlib
+import numpy as np
+import pandas as pd
 
-matplotlib.use("Agg")
-import matplotlib.patheffects as pe  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import textwrap  # noqa: E402
-
-from matplotlib.colors import BoundaryNorm  # noqa: E402
-
-from . import maps  # noqa: E402
-
-SURVEY_DATE = dt.datetime(2026, 1, 20)   # ASSUMED: the file has times but no dates
-HAMPEL_WINDOW = 11
-HAMPEL_K = 6.0
-HAMPEL_FLOOR_NT = 30.0
-CROSSOVER_M = 5.0
-GRID_SPACING_M = 50.0
-BLOCK_M = 100.0
-MASK_KM = 2.0
-TAPER_KM = 3.0
+from ..common.mapping import EXTENT
+from .settings import (BLOCK_M, CROSSOVER_M, GRID_SPACING_M, HAMPEL_FLOOR_NT, HAMPEL_K,  # noqa: F401
+                       HAMPEL_WINDOW, MASK_KM, SURVEY_DATE, TAPER_KM)
 
 
-# ----------------------------------------------------------------------------- load and QC
+# -----------------------------------------------------------------------------
+# Load and QC
 def load(path):
+    """Step 1: read the workbook (all rows, Excel row numbers), UTM 36N coordinates and coordinate check, diurnal correction, day segments from the time stamps."""
     import pyproj
 
     raw = pd.read_excel(path, sheet_name=0, header=0)
@@ -101,6 +89,7 @@ def despike(d):
 
 
 def add_igrf(d, date=SURVEY_DATE):
+    """Step 3: IGRF-14 total field, inclination and declination at every reading; TMA = TMI - IGRF."""
     import ppigrf
 
     d = d.copy()
@@ -117,6 +106,7 @@ def add_igrf(d, date=SURVEY_DATE):
 
 
 def igrf_date_sensitivity(lon, lat):
+    """Step 4: IGRF total field and direction at the survey centre for several dates."""
     import ppigrf
 
     out = []
@@ -150,6 +140,7 @@ def crossovers(d, maxdist=CROSSOVER_M):
 
 
 def day_summary(d):
+    """Step 4: per-day reading counts, time span, position, diurnal correction and field statistics."""
     g = d[d["day_seq"] > 0].groupby("day_seq")
     return g.agg(n_readings=("tmi_corr_nT", "size"), n_accepted=("accepted", "sum"),
                  time_first=("time_hhmmss", "first"), time_last=("time_hhmmss", "last"),
@@ -159,7 +150,8 @@ def day_summary(d):
                  tmi_max_nT=("tmi_corr_nT", "max")).reset_index()
 
 
-# ----------------------------------------------------------------------------- gridding / RTP
+# -----------------------------------------------------------------------------
+# Gridding and reduction to the pole
 def _chain():
     import verde as vd
     return vd.Chain([("block", vd.BlockReduce(np.median, spacing=BLOCK_M)),
@@ -189,7 +181,8 @@ def _dist_to_data(g, x, y):
     return dist.reshape(E.shape)
 
 
-def grid_field(x, y, v, extent=maps.EXTENT):
+def grid_field(x, y, v, extent=EXTENT):
+    """Step 5: grid a field (block median, trend, spline) on GRID_SPACING_M, blanked > MASK_KM from data."""
     chain = _chain().fit((x, y), v)
     g = chain.grid(region=_region(extent), spacing=GRID_SPACING_M, data_names="value", dims=("northing", "easting"))
     dist = _dist_to_data(g, x, y)
@@ -198,13 +191,14 @@ def grid_field(x, y, v, extent=maps.EXTENT):
 
 
 def cv_rmse(x, y, v):
+    """Block K-fold cross-validation rms error of the gridding chain."""
     import verde as vd
     bx, bv = vd.BlockReduce(np.median, spacing=BLOCK_M).filter((x, y), v)
     cv = vd.BlockKFold(spacing=2000, n_splits=5, shuffle=True, random_state=0)
     return float(-np.mean(vd.cross_val_score(_chain(), bx, bv, cv=cv, scoring="neg_root_mean_squared_error")))
 
 
-def rtp_grid(x, y, tma, inc, dec, extent=maps.EXTENT):
+def rtp_grid(x, y, tma, inc, dec, extent=EXTENT):
     """Reduction to the pole of the total-field anomaly (induced magnetisation)."""
     import harmonica as hm
     import xrft
@@ -227,127 +221,3 @@ def rtp_grid(x, y, tma, inc, dec, extent=maps.EXTENT):
     reg = _region(extent)
     r = r.sel(easting=slice(reg[0], reg[1]), northing=slice(reg[2], reg[3]))
     return r.to_dataset(name="value")
-
-
-# ----------------------------------------------------------------------------- figures
-def equalised_norm(values, n_levels=64):
-    """Histogram-equalised colour classes (equal numbers of values per colour band)."""
-    v = np.asarray(values, float)
-    v = v[np.isfinite(v)]
-    levels = np.unique(np.round(np.percentile(v, np.linspace(0.5, 99.5, n_levels + 1)), 1))
-    return BoundaryNorm(levels, ncolors=256, extend="both"), levels
-
-
-def _equalised_colorbar(fig, m, ax, label, levels):
-    cb = maps.colorbar(fig, m, ax, label + "  (histogram-equalised)")
-    idx = np.linspace(0, len(levels) - 1, 9).round().astype(int)
-    cb.set_ticks(levels[idx])
-    cb.set_ticklabels([f"{levels[i]:,.0f}" for i in idx])
-    return cb
-
-
-def _credit(ax, text):
-    maps.credit(ax, "\n".join(textwrap.wrap(text, 175)))
-
-
-def _nice_step(lo, hi, n=18):
-    raw = (hi - lo) / n
-    mag = 10 ** np.floor(np.log10(raw))
-    for m in (1, 2, 2.5, 5, 10):
-        if raw <= m * mag:
-            return m * mag
-    return 10 * mag
-
-
-def map_points(bm, d, ref, col, title, label, fname, fdir, center=None, subtitle="", note=""):
-    a = d[d["accepted"]]
-    norm, levels = equalised_norm(a[col])
-    fig, ax = plt.subplots(figsize=(8.6, 5.6))
-    bm.draw(ax, relief_alpha=0.85)
-    o = a.iloc[np.argsort(np.abs(a[col].values - np.median(a[col])))]
-    m = ax.scatter(o["lon"], o["lat"], c=o[col], s=3.2, cmap=maps.ANOM, norm=norm, lw=0, zorder=12, rasterized=True)
-    sp = d[d["flags"].str.contains("SPIKE")]
-    ax.scatter(sp["lon"], sp["lat"], s=7, marker="x", c="#1d1d1b", lw=0.5, zorder=13,
-               label=f"rejected spikes ({len(sp)})")
-    maps.base100(ax, ref)
-    maps.scalebar(ax)
-    maps.north_arrow(ax)
-    _equalised_colorbar(fig, m, ax, label, levels)
-    ax.legend(loc="lower right", markerscale=1.5)
-    ax.set_title(title, loc="left", pad=14 if subtitle else 6)
-    if subtitle:
-        ax.text(0, 1.012, subtitle, transform=ax.transAxes, fontsize=7.2, color=maps.INK2, va="bottom")
-    _credit(ax, note)
-    fig.savefig(os.path.join(fdir, fname), dpi=maps.DPI)
-    plt.close(fig)
-
-
-def map_grid(bm, g, d, ref, title, label, fname, fdir, center=None, subtitle="", note="", track_alpha=0.45):
-    LON, LAT = _lonlat(g)
-    Z = g["value"].values
-    lo, hi = np.nanpercentile(Z, [1, 99])
-    norm, levels = equalised_norm(Z)
-    step = _nice_step(lo, hi)
-    fig, ax = plt.subplots(figsize=(8.6, 5.6))
-    bm.draw(ax, relief_alpha=0.85)
-    m = ax.pcolormesh(LON, LAT, Z, cmap=maps.ANOM, norm=norm, shading="auto", alpha=0.85, zorder=5, rasterized=True)
-    lev = np.arange(np.floor(lo / step) * step, np.ceil(hi / step) * step + step / 2, step)
-    cs = ax.contour(LON, LAT, Z, levels=lev, colors=maps.INK, linewidths=0.35, alpha=0.7, zorder=6)
-    lab = ax.clabel(cs, levels=cs.levels[::2], fmt="%g", fontsize=5.5, inline=True, inline_spacing=2)
-    for t in lab:
-        t.set_path_effects([pe.withStroke(linewidth=1.6, foreground="white")])
-    a = d[d["accepted"]]
-    ax.scatter(a["lon"].values[::4], a["lat"].values[::4], s=0.25, c=maps.INK, lw=0, alpha=track_alpha, zorder=7,
-               rasterized=True)
-    maps.base100(ax, ref)
-    maps.scalebar(ax)
-    maps.north_arrow(ax)
-    _equalised_colorbar(fig, m, ax, label, levels)
-    ax.set_title(title, loc="left", pad=14 if subtitle else 6)
-    if subtitle:
-        ax.text(0, 1.012, subtitle, transform=ax.transAxes, fontsize=7.2, color=maps.INK2, va="bottom")
-    _credit(ax, f"Contour interval {step:g} nT. Biharmonic spline after {BLOCK_M:.0f} m block median, "
-                    f"{GRID_SPACING_M:.0f} m grid, blanked >{MASK_KM:g} km from data; grey dots = survey tracks. "
-                    f"Relief: Copernicus GLO-30. {note}")
-    fig.savefig(os.path.join(fdir, fname), dpi=maps.DPI)
-    plt.close(fig)
-
-
-def save_grid(g, path_stem, name):
-    LON, LAT = _lonlat(g)
-    g.to_netcdf(path_stem + ".nc")
-    E, N = np.meshgrid(g.easting, g.northing)
-    pd.DataFrame({"lon": LON.ravel(), "lat": LAT.ravel(), "easting_utm36n": E.ravel(), "northing_utm36n": N.ravel(),
-                  name: g["value"].values.ravel()}).dropna().to_csv(path_stem + "_xyz.csv", index=False,
-                                                                     float_format="%.6f")
-
-
-def write_workbook(path, d, days, xs, igrf_sens, meta):
-    from .export import _write_sheet
-    from openpyxl import Workbook
-    from openpyxl.styles import Font
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "README"
-    lines = [("Wadi Ghadir ground magnetic survey – processed total field, anomaly and QC", True),
-             ("Prepared by Dr. Mohamed Sobh, LIAG. Produced by scripts/run_magnetics.py.", False), ("", False)]
-    lines += [(f"{k}: {v}", False) for k, v in meta.items()]
-    lines += [("", False), ("Columns of Mag_Data", True),
-              ("tmi_corr_nT = diurnally corrected total field as supplied; igrf_F_nT = IGRF-14 total field; "
-               "tma_nT = tmi_corr_nT - igrf_F_nT (total-field anomaly); accepted = not a spike/non-data row; "
-               "flags = QC reasons; day_seq = survey day inferred from the time stamps.", False)]
-    for t, b in lines:
-        ws.append([t])
-        if b:
-            ws.cell(ws.max_row, 1).font = Font(bold=True, size=11)
-    ws.column_dimensions["A"].width = 150
-    cols = ["source_row", "day_seq", "time_hhmmss", "lat", "lon", "utm_e", "utm_n", "elev_file", "reading_nT",
-            "diurnal_corr_nT", "tmi_corr_nT", "igrf_F_nT", "igrf_inc_deg", "igrf_dec_deg", "tma_nT",
-            "hampel_dev_nT", "accepted", "flags"]
-    _write_sheet(wb.create_sheet("Mag_Data"), d[cols], {"lat": "0.0000000", "lon": "0.0000000", "utm": "0.00",
-                                                       "_nT": "0.00", "_deg": "0.000"})
-    _write_sheet(wb.create_sheet("Day_Summary"), days)
-    _write_sheet(wb.create_sheet("Crossovers"), xs)
-    _write_sheet(wb.create_sheet("IGRF_Date_Sensitivity"), igrf_sens)
-    wb.save(path)

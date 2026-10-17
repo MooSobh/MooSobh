@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
-"""Assemble the downloadable delivery folder and zip it.
+"""Assemble the downloadable packages.
 
-Run after scripts/run_processing.py and scripts/build_report_html.py:
-    python scripts/make_package.py --out dist
-Produces dist/Wadi_Ghadir_Gravity_Package/ and dist/Wadi_Ghadir_Gravity_Package.zip
+Run after scripts/run_all.py and scripts/build_report_html.py:
+    python scripts/make_package.py --out dist             # results delivery folder + zip (+ zip parts)
+    python scripts/make_package.py --out dist --chains    # code-only package: chains, notebooks, environment
+
+Results package:  dist/Wadi_Ghadir_Gravity_Package/ and .zip (report, maps, figures, data, grids, tables,
+                  code, input data)
+Chains package:   dist/Wadi_Ghadir_Processing_Chains.zip (package wghadir, scripts, tests, executed notebooks,
+                  environment.yml, input data, reference result sheets; the 12 MB DEM is downloaded
+                  automatically on the first run)
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import argparse
 import glob
@@ -13,6 +22,9 @@ import shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NAME = "Wadi_Ghadir_Gravity_Package"
+CHAINS_NAME = "Wadi_Ghadir_Processing_Chains"
+CODE_FILES = ("README.md", "environment.yml", "requirements.txt", "pyproject.toml")
+IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", ".ipynb_checkpoints", "*.egg-info")
 
 README = """# Wadi Ghadir gravity survey – delivery package
 
@@ -28,7 +40,7 @@ Prepared by Dr. Mohamed Sobh, LIAG.
 | `05_Results_Data/` | **Final results**: `Wadi_Ghadir_Gravity_Results.xlsx` (all sheets, column dictionary), `Wadi_Ghadir_Magnetic_Results.xlsx`, `Wadi_Ghadir_Final_Stations.csv`, GeoJSON (GIS) and KML (Google Earth) |
 | `06_Grids/` | Gridded maps as NetCDF and XYZ CSV (lon, lat, UTM 36N, value) + gridding cross-validation |
 | `07_Tables_CSV/` | Every processing table (QC rows, occupations, base control, ties, GNSS, Nettleton, …) and `summary.json` |
-| `08_Scripts/` | Complete Python processing chain, tests and requirements |
+| `08_Scripts/` | Python package `wghadir` (gravity and magnetic chains), scripts, notebooks, tests, `environment.yml` |
 | `09_Input_Data/` | Raw CG-6 and GNSS files as supplied; DEM and geoid windows used (with provenance) |
 
 ## Key products (Final_Stations sheet)
@@ -45,9 +57,9 @@ sections 1 and 5 before interpreting the values.
 
 ```bash
 cd 08_Scripts
-python -m pip install -r requirements.txt
-python scripts/run_processing.py --raw ../09_Input_Data/raw --external ../09_Input_Data/external --out outputs
-python scripts/run_magnetics.py --mag ../09_Input_Data/raw/magnetics/All_Data_Corrected_Total_Intensity.xlsx --external ../09_Input_Data/external --out outputs
+conda env create -f environment.yml && conda activate wghadir     # or: python -m pip install -r requirements.txt
+python scripts/run_all.py --raw ../09_Input_Data/raw --external ../09_Input_Data/external --out outputs \
+    --mag ../09_Input_Data/raw/magnetics/All_Data_Corrected_Total_Intensity.xlsx
 ```
 """
 
@@ -67,7 +79,10 @@ def main():
     ap.add_argument("--out", default="dist")
     ap.add_argument("--split-mb", type=float, default=40.0,
                     help="also write numbered zip parts below this size (0 = off)")
+    ap.add_argument("--chains", action="store_true", help="build the code-only chains package instead")
     a = ap.parse_args()
+    if a.chains:
+        return chains_package(os.path.join(ROOT, a.out))
     pkg = os.path.join(ROOT, a.out, NAME)
     if os.path.exists(pkg):
         shutil.rmtree(pkg)
@@ -96,10 +111,9 @@ def main():
     }
     shutil.copy2(os.path.join(ROOT, "outputs", "summary.json"), os.path.join(pkg, "07_Tables_CSV"))
     code = os.path.join(pkg, "08_Scripts")
-    for d in ("wghadir", "scripts", "tests"):
-        shutil.copytree(os.path.join(ROOT, d), os.path.join(code, d),
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    for f in ("requirements.txt", "README.md"):
+    for d in ("wghadir", "scripts", "tests", "notebooks"):
+        shutil.copytree(os.path.join(ROOT, d), os.path.join(code, d), ignore=IGNORE)
+    for f in CODE_FILES:
         shutil.copy2(os.path.join(ROOT, f), code)
     shutil.copytree(os.path.join(ROOT, "data", "raw"), os.path.join(pkg, "09_Input_Data", "raw"))
     shutil.copytree(os.path.join(ROOT, "data", "external"), os.path.join(pkg, "09_Input_Data", "external"))
@@ -109,6 +123,34 @@ def main():
     print(f"package: {pkg}\nzip: {zpath} ({os.path.getsize(zpath) / 1e6:.1f} MB)")
     if a.split_mb:
         split_zips(pkg, os.path.join(ROOT, a.out), a.split_mb * 1e6)
+
+
+def chains_package(out_dir):
+    """One zip with the processing chains: code, notebooks, environment and the input data."""
+    pkg = os.path.join(out_dir, CHAINS_NAME)
+    if os.path.exists(pkg):
+        shutil.rmtree(pkg)
+    os.makedirs(pkg)
+    for d in ("wghadir", "scripts", "tests", "notebooks"):
+        shutil.copytree(os.path.join(ROOT, d), os.path.join(pkg, d), ignore=IGNORE)
+    for f in CODE_FILES:
+        shutil.copy2(os.path.join(ROOT, f), pkg)
+    os.makedirs(os.path.join(pkg, "report"))
+    shutil.copy2(os.path.join(ROOT, "report", "REPORT.md"), os.path.join(pkg, "report"))
+    shutil.copytree(os.path.join(ROOT, "data", "raw"), os.path.join(pkg, "data", "raw"))
+    # the geoid window and the DEM provenance are small; the 12 MB DEM is fetched on the first run
+    ext = os.path.join(pkg, "data", "external")
+    os.makedirs(ext)
+    for f in sorted(os.listdir(os.path.join(ROOT, "data", "external"))):
+        if not f.startswith("copernicus_glo30_wadi_ghadir.tif"):
+            shutil.copy2(os.path.join(ROOT, "data", "external", f), ext)
+    # the delivered result sheets, to compare a local run with
+    shutil.copytree(os.path.join(ROOT, "outputs", "deliverables"), os.path.join(pkg, "reference_results"))
+    for f in ("summary.json", "magnetics_summary.json"):
+        shutil.copy2(os.path.join(ROOT, "outputs", f), os.path.join(pkg, "reference_results"))
+    zpath = shutil.make_archive(pkg, "zip", out_dir, CHAINS_NAME)
+    print(f"chains package: {zpath} ({os.path.getsize(zpath) / 2 ** 20:.1f} MiB)")
+    return zpath
 
 
 def split_zips(pkg, out_dir, limit):

@@ -18,18 +18,21 @@ modelled.
 
 The result g1 is the vertical attraction for a density of 1 g/cm3, in mGal; for
 density rho the topographic effect is rho * g1 (linear in rho).
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import numpy as np
 
-R_EARTH = 6371008.8
-COARSE = 8                 # coarse cell = 8 x 8 DEM cells (~240 m x 250 m)
-INNER_COARSE = 8           # inner zone = +/- 8 coarse cells (~ +/- 2 km)
-OUTER_RADIUS_M = 22000.0   # Hayford zone O outer radius (21.9 km)
-FLATTEN_RADIUS_M = 50.0
-SENSOR_OFFSET_M = 0.2      # CG-6 sensor above the GNSS-measured point (assumed, not recorded)
+from .settings import (COARSE, FLATTEN_RADIUS_M, INNER_COARSE, OUTER_RADIUS_M,  # noqa: F401
+                       R_EARTH, SENSOR_OFFSET_M)
 
 
 class TopoModel:
+    """Prism model of the DEM: inner zone of 1-arcsecond cells, outer zone of COARSE x COARSE block means.
+
+    unit_effect(lon, lat, H) returns the vertical attraction g1 [mGal] for 1 g/cm3 at the station.
+    """
     def __init__(self, grid, coarse=COARSE):
         self.g = grid
         self.coarse = coarse

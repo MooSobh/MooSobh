@@ -1,57 +1,122 @@
-# Wadi Ghadir CG-6 gravity survey – processing and QC
+# Wadi Ghadir gravity and magnetic survey – processing chains
 
-Reproducible processing of the January 2026 Wadi Ghadir (Eastern Desert, Egypt)
-relative gravity survey: two Scintrex CG-6 meters (#0640 and #0313) and the GNSS
-point files.
+**Prepared by Dr. Mohamed Sobh, LIAG** (Leibniz Institute for Applied Geophysics)
 
-* **Technical report:** [`report/REPORT.md`](report/REPORT.md) (an HTML version with embedded figures is in `report/REPORT.html`)
-* **Machine-readable outputs:** `outputs/tables/*.csv`, `outputs/summary.json`
-* **Figures:** `outputs/figures/*.png`
+Reproducible processing of the January 2026 Wadi Ghadir (Eastern Desert, Egypt) survey:
 
-## Status of the products
+* **Gravity:** two Scintrex CG-6 meters (#0640 and #0313), GNSS station coordinates, Copernicus
+  GLO-30 DEM and EGM2008 geoid. Products: free-air, simple and complete (terrain-corrected) Bouguer
+  anomalies relative to base 100 for ρ = 2.0–3.0 g/cm³, and Nettleton density analysis.
+* **Magnetics:** diurnally corrected total field. Products: QC and despiking, IGRF-14 anomaly,
+  grids and reduction to the pole.
+
+The technical report is [`report/REPORT.md`](report/REPORT.md). An HTML version with embedded figures is
+in `report/REPORT.html`.
+
+## 1  Installation
+
+With conda or mamba (recommended: rasterio and pyproj come with their binary libraries):
+
+```bash
+conda env create -f environment.yml
+conda activate wghadir
+python -m pytest -q              # 10 tests, about 5 s
+```
+
+With pip, using an existing Python ≥ 3.10:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -e .       # optional: makes `import wghadir` work from anywhere
+```
+
+## 2  Running the chains
+
+**Step by step in Jupyter** (recommended for checking every intermediate result):
+
+```bash
+jupyter lab notebooks/
+```
+
+* `notebooks/01_Gravity_Processing.ipynb` runs the gravity chain, steps 1–14.
+* `notebooks/02_Magnetic_Processing.ipynb` runs the magnetic chain, steps 1–8.
+
+**From the command line:**
+
+```bash
+python scripts/run_all.py                # gravity, then magnetics (~5 min incl. 400 dpi maps)
+python scripts/run_gravity.py            # gravity only   (--no-figures: ~1 min)
+python scripts/run_magnetics.py          # magnetics only (~1 min)
+```
+
+**From Python:**
+
+```python
+from wghadir.chains import GravityChain, MagneticChain
+
+g = GravityChain(raw_dir="data/raw", external_dir="data/external", out_dir="outputs")
+g.step01_inventory()          # ... each step can be run and inspected separately
+g.run_all()                   # or all 14 steps
+
+m = MagneticChain(mag_file="data/raw/magnetics/All_Data_Corrected_Total_Intensity.xlsx", out_dir="outputs")
+m.run_all()
+```
+
+Gravity step 7 needs the Copernicus GLO-30 DEM window (12 MB) and the EGM2008 geoid window in
+`data/external/`. Both are in the repository. In the code-only zip (`Wadi_Ghadir_Processing_Chains.zip`)
+the DEM is left out to keep the download small, and step 7 downloads it automatically on the first run
+(internet needed once; it is then cached).
+
+## 3  The processing steps
+
+| Gravity (`GravityChain`) | | Magnetics (`MagneticChain`) | |
+|---|---|---|---|
+| 1 | inventory, SHA-256, CG-6 metadata | 1 | load rows, UTM 36N, survey days |
+| 2 | check CorrGrav = Raw + Tide + Tilt + Temp + Drift | 2 | despike (Hampel filter per day) |
+| 3 | Longman tide at the GPS position (UTC) | 3 | IGRF-14 → anomaly TMA = TMI − IGRF |
+| 4 | row QC (StdDev, tilt, overflow, frozen sensor, repeats) | 4 | day summary, crossovers, IGRF date sensitivity |
+| 5 | station occupations | 5 | gridding of TMI and TMA |
+| 6 | GNSS parsing, datum check, day mapping, matching | 6 | reduction to the pole (FFT) |
+| 7 | EGM2008 orthometric heights, DEM comparison | 7 | maps: points and grids |
+| 8 | base-100 control, drift model, closures | 8 | export: tables, grids, workbook |
+| 9 | instrument scale factor and re-ties | | |
+| 10 | free-air and simple Bouguer anomalies | | |
+| 11 | DEM terrain correction, complete Bouguer anomalies | | |
+| 12 | Nettleton density (profiles, windows, consensus) | | |
+| 13 | summary and deliverables (xlsx, csv, geojson, kml) | | |
+| 14 | QC figures, maps, grids, Nettleton sheets | | |
+
+All tunable values are in `wghadir/gravity/settings.py` and `wghadir/magnetic/settings.py`.
+
+## 4  Layout
+
+```
+environment.yml, requirements.txt, pyproject.toml   installation
+notebooks/                 01_Gravity_Processing.ipynb, 02_Magnetic_Processing.ipynb
+scripts/                   run_all.py, run_gravity.py, run_magnetics.py, build_report_html.py, make_package.py
+wghadir/
+  chains/gravity.py        GravityChain   – the gravity chain, steps 1-14
+  chains/magnetic.py       MagneticChain  – the magnetic chain, steps 1-8
+  gravity/                 settings, cg6 reader, tide, qc, gnss, inventory, positioning, base_control,
+                           instruments, reduce, terrain, reductions, nettleton, density,
+                           figures, maps, nettleton_figs, export
+  magnetic/                settings, processing (QC, IGRF, gridding, RTP), maps, export
+  common/                  geodata (DEM, geoid), mapping (map style), excel, display (notebooks)
+tests/                     regression tests (python -m pytest -q)
+data/raw/                  supplied files, unchanged (SHA-256 in outputs/tables/01_file_inventory.csv)
+data/external/             Copernicus GLO-30 and EGM2008 windows used (with provenance)
+outputs/                   results: deliverables/, tables/, maps/, grids/, figures/, nettleton/, magnetics/
+report/                    REPORT.md and REPORT.html
+reference_results/         (zip only) delivered result sheets and summaries, to compare a local run with
+```
+
+## 5  Status of the products
 
 | Product | Status |
 |---|---|
 | Δg relative to base 100, per station, with QC and drift control | ready (985 field stations) |
-| Free-air, simple Bouguer and **complete (terrain-corrected) Bouguer** anomalies relative to base 100, ρ = 2.0–3.0 g/cm³ | ready, relative to base 100 (EGM2008 orthometric heights; Copernicus GLO-30 terrain correction) |
+| Free-air, simple Bouguer and **complete (terrain-corrected) Bouguer** anomalies relative to base 100, ρ = 2.0–3.0 g/cm³ | ready (EGM2008 orthometric heights; Copernicus GLO-30 terrain correction) |
 | Maps (11), Nettleton sheets (22 profiles), grids (NetCDF/XYZ), Excel workbook, GeoJSON, KML | ready |
-| Ground magnetics: total field (points and grid), IGRF-14 anomaly, reduced-to-pole, Excel workbook | ready (IGRF date assumed 20 Jan 2026) |
+| Ground magnetics: total field (points and grid), IGRF-14 anomaly, reduced-to-pole, Excel workbook | ready (IGRF date assumed: 20 Jan 2026) |
 | Absolute anomalies | **not possible** without an absolute gravity tie |
 | Bouguer density | working value 2.67 g/cm³; robust Nettleton profiles 2.71–2.96 g/cm³ (report §4.3) |
-
-## Run
-
-```bash
-python -m pip install -r requirements.txt
-python scripts/run_processing.py --raw data/raw --out outputs   # ~3 min; first run downloads DEM/geoid windows
-python scripts/run_magnetics.py                                 # magnetics: QC, IGRF, maps, RTP (~1 min)
-python scripts/build_report_html.py                             # report/REPORT.html
-python scripts/make_package.py --out dist                       # dist/Wadi_Ghadir_Gravity_Package(.zip)
-python -m pytest -q tests
-```
-
-## Layout
-
-```
-data/raw/               supplied files, unchanged (SHA-256 in outputs/tables/01_file_inventory.csv)
-data/external/          Copernicus GLO-30 and EGM2008 windows used (with provenance)
-wghadir/cg6.py          CG-6 export reader, occupation grouping
-wghadir/tide.py         Longman (1959) tide, reproduces the CG-6 TideCorr to 0.2 µGal rms
-wghadir/qc.py           row-level QC thresholds and flags
-wghadir/gnss.py         DMS workbooks and KML readers
-wghadir/pipeline.py     processing stages (inventory → QC → GNSS → base control → reductions → Nettleton)
-wghadir/reduce.py       normal gravity, free-air, Bouguer slab
-wghadir/nettleton.py    density sweep, regression density, block bootstrap
-wghadir/geodata.py      Copernicus GLO-30 DEM and EGM2008 geoid (download + cache), sampling, hillshade
-wghadir/terrain.py      DEM prism topographic effect (Harmonica), inner/outer zones, Earth curvature
-wghadir/maps.py         publication maps and grids (Verde spline, UTM 36N)
-wghadir/nettleton_figs.py  per-profile Nettleton sheets and summaries
-wghadir/export.py       Excel workbook, GeoJSON, KML
-wghadir/magnetics.py    magnetic QC (despike, crossovers), IGRF-14, gridding, RTP, maps
-wghadir/figures.py      QC figures
-scripts/run_processing.py      full chain
-scripts/build_report_html.py   self-contained HTML report
-scripts/make_package.py        delivery folder and zip
-scripts/terrain_correction.py  stand-alone terrain correction for another DEM (+ slab self-test)
-tests/                  regression tests
-```

@@ -1,11 +1,15 @@
-"""Deliverable exports: formatted Excel workbook, GeoJSON and KML of the final stations."""
+"""Deliverable exports: formatted Excel workbook, GeoJSON and KML of the final stations.
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
+"""
 import json
-import os
 
 import numpy as np
 import pandas as pd
 
-from .pipeline import RHO_LIST
+from ..common.excel import write_sheet
+from .settings import RHO_LIST
 
 # (output column, source column, unit / description)
 FINAL_COLUMNS = [
@@ -56,6 +60,7 @@ FINAL_COLUMNS += [
 
 
 def final_station_table(st):
+    """Final station table (one row per product station) with the column names of FINAL_COLUMNS and UTM 36N coordinates."""
     import pyproj
     s = st[st["product_ok"]].copy()
     tr = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:32636", always_xy=True)
@@ -65,41 +70,8 @@ def final_station_table(st):
     return out.sort_values(["Instrument", "Date", "Time_UTC"]).reset_index(drop=True)
 
 
-def _write_sheet(ws, df, number_formats=None, widths=None):
-    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
-
-    head_fill = PatternFill("solid", fgColor="1C3D5A")
-    head_font = Font(bold=True, color="FFFFFF", size=10)
-    thin = Side(style="thin", color="D0D0D0")
-    ws.append(list(df.columns))
-    for c in ws[1]:
-        c.fill, c.font = head_fill, head_font
-        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        c.border = Border(bottom=thin)
-    for row in df.itertuples(index=False):
-        ws.append([None if (isinstance(v, float) and not np.isfinite(v)) else
-                   (v.item() if isinstance(v, np.generic) else v) for v in row])
-    ws.freeze_panes = "B2" if df.shape[1] > 6 else "A2"
-    ws.auto_filter.ref = ws.dimensions
-    ws.row_dimensions[1].height = 34
-    for j, col in enumerate(df.columns, start=1):
-        letter = get_column_letter(j)
-        w = (widths or {}).get(col) or min(max(len(str(col)) * 0.9, 9), 28)
-        ws.column_dimensions[letter].width = w
-        fmt = None
-        for key, f in (number_formats or {}).items():
-            if key in col:
-                fmt = f
-        if fmt is None and pd.api.types.is_float_dtype(df[col]):
-            fmt = "0.000"
-        if fmt:
-            for cell in ws.iter_cols(min_col=j, max_col=j, min_row=2, max_row=ws.max_row):
-                for c in cell:
-                    c.number_format = fmt
-
-
 def write_workbook(path, ctx):
+    """Write the formatted results workbook (README, Final_Stations, Column_Dictionary, profiles, Nettleton, QC sheets); return the final table."""
     from openpyxl import Workbook
     from openpyxl.styles import Font
 
@@ -109,7 +81,7 @@ def write_workbook(path, ctx):
     ws.title = "README"
     lines = [
         ("Wadi Ghadir gravity survey (Eastern Desert, Egypt), 16-24 January 2026 – final results", True),
-        ("Prepared by Dr. Mohamed Sobh, LIAG. Produced by scripts/run_processing.py from the raw CG-6 and GNSS files.", False),
+        ("Prepared by Dr. Mohamed Sobh, LIAG. Produced by the gravity processing chain (wghadir.chains.gravity) from the raw CG-6 and GNSS files.", False),
         ("", False),
         ("Conventions", True),
         ("All anomalies are RELATIVE TO BASE 100 (24.786749 N, 34.933755 E). No absolute gravity tie exists; add the "
@@ -138,45 +110,46 @@ def write_workbook(path, ctx):
     ws.column_dimensions["A"].width = 150
 
     fmts = {"_deg": "0.000000", "UTM": "0", "_m": "0.00", "mGal": "0.000", "sigma": "0.000", "km": "0.0"}
-    _write_sheet(wb.create_sheet("Final_Stations"), final, fmts, widths={"Station_UID": 30, "GNSS_Source": 22})
-    _write_sheet(wb.create_sheet("Column_Dictionary"),
+    write_sheet(wb.create_sheet("Final_Stations"), final, fmts, widths={"Station_UID": 30, "GNSS_Source": 22})
+    write_sheet(wb.create_sheet("Column_Dictionary"),
                  pd.DataFrame([(o, d) for o, _, d in FINAL_COLUMNS], columns=["Column", "Definition / unit"]),
                  widths={"Column": 24, "Definition / unit": 90})
     pcols = ["profile_id", "instrument", "date", "line", "station", "chainage_m", "lat", "lon", "H_ortho_m", "H_dem_m",
              "dh_m", "dFA_rel_mgal", "u_slab_mgal_per_gcc", "u_topo_mgal_per_gcc", "dSB_rel_rho2.67_mgal",
              "dCB_rel_rho2.67_mgal", "drift_mode"]
-    _write_sheet(wb.create_sheet("Profiles"), ctx["prof"][pcols].sort_values(["profile_id", "chainage_m"]),
+    write_sheet(wb.create_sheet("Profiles"), ctx["prof"][pcols].sort_values(["profile_id", "chainage_m"]),
                  {"lat": "0.000000", "lon": "0.000000"})
-    _write_sheet(wb.create_sheet("Nettleton_Results"), ctx["net"])
-    _write_sheet(wb.create_sheet("Nettleton_Sweeps"), ctx["sweeps"][["profile_id", "method", "rho", "corr_detrended",
+    write_sheet(wb.create_sheet("Nettleton_Results"), ctx["net"])
+    write_sheet(wb.create_sheet("Nettleton_Sweeps"), ctx["sweeps"][["profile_id", "method", "rho", "corr_detrended",
                                                                      "rms_detrended_mgal", "roughness_2nd_diff_mgal"]])
-    _write_sheet(wb.create_sheet("Nettleton_Windows"), ctx["win"])
-    _write_sheet(wb.create_sheet("Density_Consensus"), ctx["cons"])
-    _write_sheet(wb.create_sheet("Base_Control"), ctx["ctrl"].assign(t=lambda d: d["t"].astype(str)))
-    _write_sheet(wb.create_sheet("Hotel_Base_Ties"), ctx["ties"].assign(t_hotel=lambda d: d["t_hotel"].astype(str),
+    write_sheet(wb.create_sheet("Nettleton_Windows"), ctx["win"])
+    write_sheet(wb.create_sheet("Density_Consensus"), ctx["cons"])
+    write_sheet(wb.create_sheet("Base_Control"), ctx["ctrl"].assign(t=lambda d: d["t"].astype(str)))
+    write_sheet(wb.create_sheet("Hotel_Base_Ties"), ctx["ties"].assign(t_hotel=lambda d: d["t_hotel"].astype(str),
                                                                         t_base100=lambda d: d["t_base100"].astype(str)))
-    _write_sheet(wb.create_sheet("Daily_Closures"), ctx["closures"].assign(
+    write_sheet(wb.create_sheet("Daily_Closures"), ctx["closures"].assign(
         base100_first_time=lambda d: d["base100_first_time"].astype(str)))
     sc = {k: v for k, v in ctx["sc"].items() if not isinstance(v, dict)}
-    _write_sheet(wb.create_sheet("Instrument_Scale"), pd.concat(
+    write_sheet(wb.create_sheet("Instrument_Scale"), pd.concat(
         [pd.DataFrame([sc]).T.reset_index().rename(columns={"index": "quantity", 0: "value"}),
          pd.DataFrame([{}]), ctx["pairs"]], ignore_index=True))
-    _write_sheet(wb.create_sheet("Height_Datum_Check"), ctx["hchk"])
-    _write_sheet(wb.create_sheet("Terrain_Validation"), ctx["tval"])
+    write_sheet(wb.create_sheet("Height_Datum_Check"), ctx["hchk"])
+    write_sheet(wb.create_sheet("Terrain_Validation"), ctx["tval"])
     occ = ctx["occ"].copy()
     for c in ("t_start", "t_end", "t_mid"):
         occ[c] = occ[c].astype(str)
-    _write_sheet(wb.create_sheet("Occupations"), occ)
+    write_sheet(wb.create_sheet("Occupations"), occ)
     rows = ctx["df"].drop(columns=["t"], errors="ignore").copy()
     rows["time_utc"] = rows["time_utc"].astype(str)
-    _write_sheet(wb.create_sheet("Rows_QC"), rows)
-    _write_sheet(wb.create_sheet("Instrument_Metadata"), ctx["meta"].T.reset_index().rename(
+    write_sheet(wb.create_sheet("Rows_QC"), rows)
+    write_sheet(wb.create_sheet("Instrument_Metadata"), ctx["meta"].T.reset_index().rename(
         columns={"index": "field"}).astype(str))
     wb.save(path)
     return final
 
 
 def write_geojson(path, final):
+    """Write the final stations as a GeoJSON point collection (WGS84)."""
     feats = []
     keep = ["Station_UID", "Instrument", "Date", "Line", "Station", "H_ortho_m", "dg_rel_base100_mGal",
             "FA_rel_mGal", "SB_rel_2.67_mGal", "CB_rel_2.67_mGal", "TC_2.67_mGal", "sigma_FA_mGal"]
@@ -193,6 +166,7 @@ def write_geojson(path, final):
 
 
 def write_kml(path, final):
+    """Write the final stations as KML placemarks for Google Earth."""
     col = {"CG6-0640": "ffd6782a", "CG6-0313": "ff3468eb"}
     out = ['<?xml version="1.0" encoding="UTF-8"?>', '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>',
            "<name>Wadi Ghadir gravity stations</name>"]

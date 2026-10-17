@@ -2,26 +2,14 @@
 
 All rows are retained; each row gets an explicit accept/reject decision and a
 semicolon-separated list of reasons.  Warnings do not reject a row.
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import numpy as np
 import pandas as pd
 
-# Documented thresholds (see report section 3.1).  Units: mGal and arc-seconds.
-THRESHOLDS = {
-    "stddev_reject_mgal": 0.080,   # ~99.5th percentile of the combined data set
-    "stddev_warn_mgal": 0.050,     # ~95th percentile
-    "tilt_reject_arcsec": 30.0,    # |X| or |Y| beyond this: levelling not trusted
-    "tilt_warn_arcsec": 20.0,
-    "repeat_outlier_mgal": 0.050,  # deviation from median of the other readings (n >= 3)
-    "repeat_range_warn_mgal": 0.050,  # two-reading occupations
-    "gps_spread_warn_m": 50.0,     # spread of CG-6 internal GPS positions within an occupation
-    "gross_range_mgal": 500.0,     # |g - instrument median|; true survey range is < 170 mGal
-}
-
-# Frozen sensor output: RawGrav pinned at this level irrespective of station.
-# Evidence: CG-6 0313 returned RawGrav 8008.32-8008.36 mGal both at station 100
-# and at station 0, whose gravity differs by ~65 mGal (2026-01-18 15:25-16:38).
-FROZEN_RAW_WINDOW = {"CG6-0313": (8007.5, 8009.0)}
+from .settings import FROZEN_RAW_WINDOW, THRESHOLDS  # noqa: F401
 
 
 def _add(reasons, mask, code):
@@ -30,6 +18,7 @@ def _add(reasons, mask, code):
 
 
 def row_qc(df, th=THRESHOLDS):
+    """Step 4: accept/reject every reading with reasons (overflow, frozen sensor, gross range, StdDev, tilt, repeat outlier) and warnings."""
     df = df.copy().reset_index(drop=True)
     rej = [[] for _ in range(len(df))]
     warn = [[] for _ in range(len(df))]

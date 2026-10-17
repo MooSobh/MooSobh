@@ -3,8 +3,8 @@
 ## Gravity (CG-6) processing, terrain-corrected anomalies and density analysis; ground magnetic maps and RTP
 
 **Prepared by:** Dr. Mohamed Sobh, LIAG
-**Date:** 2 October 2026
-**Processing code:** `scripts/run_processing.py` (this repository); all numbers below are reproduced by that script from the files in `data/raw/`.
+**Date:** 2 October 2026 (code and notebooks finalised 17 October 2026)
+**Processing code:** Python package `wghadir` in this repository: the gravity chain `GravityChain` (14 steps) and the magnetic chain `MagneticChain` (8 steps), run with `scripts/run_all.py` or step by step in `notebooks/01_Gravity_Processing.ipynb` and `notebooks/02_Magnetic_Processing.ipynb`. All numbers below are reproduced from the files in `data/raw/`.
 
 ---
 
@@ -83,7 +83,7 @@ Both exports contain the same 24 columns: Station, Date, Time, CorrGrav, Line, S
 
 ### 2.3 Time base
 
-The exports carry no time-zone field. To identify it, I recomputed the on-board tide with the Longman (1959) formula (`wghadir/tide.py`) at the user-entered position:
+The exports carry no time-zone field. To identify it, I recomputed the on-board tide with the Longman (1959) formula (`wghadir/gravity/tide.py`) at the user-entered position:
 
 * With the time stamps taken as **UTC**, the recomputation matches the TideCorr column of both meters to 0.19–0.21 µGal rms (max 0.43 µGal).
 * With the time shifted by ±2 h or ±3 h, the misfit is 49–74 µGal rms.
@@ -347,7 +347,7 @@ The three anomaly products are
 
 **Density sensitivity.** ΔSB changes by 0.04193·Δρ·ΔH: at ΔH = 390 m, a 0.1 g/cm³ change moves it by 1.6 mGal.
 
-### 4.2 Terrain correction (`wghadir/terrain.py`, `22_terrain_validation.csv`)
+### 4.2 Terrain correction (`wghadir/gravity/terrain.py`, `22_terrain_validation.csv`)
 
 **DEM.** Copernicus DEM GLO-30, 1″ (≈ 30 m), EGM2008 heights, covering 34.48–35.26 °E and 24.45–25.07 °N. That is at least 22 km beyond every station; every station passes this coverage test.
 
@@ -366,7 +366,7 @@ g₁ is the attraction of this topography for 1 g/cm³. Because g₁ is linear i
 
 **Validation.**
 
-* A flat 300 m DEM reproduces the infinite slab to 0.1 % (`scripts/terrain_correction.py --selftest`).
+* A flat 100 m DEM processed by the same prism model (22 km, curvature) reproduces the infinite slab to 0.05 % (`tests/test_core.py::test_terrain_flat_dem_matches_slab`).
 * On 12 stations spanning the whole TC range, g₁ changes by:
   * ≤ 0.002 mGal per g/cm³ when the outer cells are halved to 120 m and the inner zone doubled to ±4 km;
   * up to 0.020 mGal per g/cm³ (0.054 mGal at 2.67) when the outer radius is cut from 22 to 20 km;
@@ -479,7 +479,7 @@ These errors apply between the traverses, not at the stations. Read the grids as
 
 ---
 
-## 5  Ground magnetic data (`scripts/run_magnetics.py`, `outputs/magnetics/`)
+## 5  Ground magnetic data (`wghadir/chains/magnetic.py`, `outputs/magnetics/`)
 
 ### 5.1 Data and processing
 
@@ -552,14 +552,33 @@ The strongest feature is a ~2 km wide RTP high in the south-west, peaking at +2 
 
 ### 6.1 Code
 
+The processing is a Python package (`wghadir`) with two chain classes whose numbered steps follow the order of this report. Every tunable value is in `wghadir/gravity/settings.py` and `wghadir/magnetic/settings.py`.
+
 ```bash
-python -m pip install -r requirements.txt
-python scripts/run_processing.py --raw data/raw --out outputs   # ~3 min (terrain stage ~2 min)
-python scripts/run_magnetics.py                                  # magnetics (~1 min, needs the gravity run)
-python scripts/build_report_html.py
-python scripts/make_package.py --out dist                        # delivery folder + zip
-python -m pytest -q tests
+conda env create -f environment.yml && conda activate wghadir   # or: python -m pip install -r requirements.txt
+python -m pytest -q                       # installation check (10 tests)
+python scripts/run_all.py                 # gravity steps 1-14, then magnetics steps 1-8 (~5 min)
+jupyter lab notebooks/                    # the same chains step by step, with tables and figures
+python scripts/build_report_html.py       # report/REPORT.html
+python scripts/make_package.py            # delivery folder and zip parts in dist/
 ```
+
+| Gravity step (`GravityChain`) | Module | Report |
+|---|---|---|
+| 1 inventory, 2 CorrGrav check, 3 tide, 5 occupations | `gravity/inventory.py`, `cg6.py`, `tide.py` | 2, 3.2 |
+| 4 row QC | `gravity/qc.py` | 3.1 |
+| 6 GNSS matching, 7 heights and DEM | `gravity/positioning.py`, `gnss.py`, `common/geodata.py` | 3.3 |
+| 8 base control and drift | `gravity/base_control.py` | 3.4 |
+| 9 instrument scale and re-ties | `gravity/instruments.py` | 3.5 |
+| 10 reductions, 11 terrain correction | `gravity/reductions.py`, `reduce.py`, `terrain.py` | 4.1–4.2 |
+| 12 Nettleton density | `gravity/density.py`, `nettleton.py` | 4.3 |
+| 13 export, 14 figures and maps | `gravity/export.py`, `figures.py`, `maps.py`, `nettleton_figs.py` | 4.4 |
+
+| Magnetic step (`MagneticChain`) | Module | Report |
+|---|---|---|
+| 1 load, 2 despike, 3 IGRF-14, 4 QC statistics | `magnetic/processing.py` | 5.1 |
+| 5 gridding, 6 reduction to the pole | `magnetic/processing.py` | 5.2 |
+| 7 maps, 8 export | `magnetic/maps.py`, `magnetic/export.py` | 5.2 |
 
 On the first run the DEM and geoid windows are downloaded into `data/external/`. Later runs use that cache and need no network.
 
@@ -574,7 +593,8 @@ On the first run the DEM and geoid windows are downloaded into `data/external/`.
 | `outputs/figures/` | QC figures (tide, corrections, readings, QC, base 100, ties, instruments, GNSS) |
 | `outputs/grids/` | NetCDF and XYZ grids of every gridded map + cross-validation |
 | `outputs/tables/` | All processing tables (01–23) and `summary.json` |
-| `dist/Wadi_Ghadir_Gravity_Package.zip` | All of the above + report, scripts and input data, as one folder |
+| `notebooks/` | Executed notebooks of both chains (tables and figures inline) |
+| `dist/` | Delivery folder and zip parts made by `scripts/make_package.py` |
 
 ### 6.3 Information still needed for final absolute complete Bouguer anomalies
 

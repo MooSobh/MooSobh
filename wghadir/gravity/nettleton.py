@@ -12,6 +12,9 @@ A linear regional trend in chainage is removed from B(rho) and from the station
 height; the density at which the residual B is uncorrelated with residual
 topography is the Nettleton estimate.  It equals the regression estimate from
 dFA = a + b x + rho * u, which also yields a standard error.
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import numpy as np
 import pandas as pd
@@ -26,6 +29,7 @@ def _detrend(x, y):
 
 
 def sweep(chain_m, h, u, fa, rho_grid=RHO_GRID):
+    """Correlation between detrended anomaly B(rho) = FA - rho u and detrended height for every rho in rho_grid."""
     x = np.asarray(chain_m, float) / 1000.0
     h_res = _detrend(x, np.asarray(h, float))
     rows = []
@@ -70,6 +74,7 @@ def block_bootstrap(chain_m, u, fa, n_boot=2000, block=5, seed=1):
 
 
 def zero_crossing(sw):
+    """Density at which the detrended correlation of a sweep changes sign (linear interpolation); NaN if none."""
     r = sw["corr_detrended"].values
     rho = sw["rho"].values
     s = np.where(np.sign(r[:-1]) != np.sign(r[1:]))[0]

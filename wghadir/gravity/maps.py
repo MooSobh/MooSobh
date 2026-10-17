@@ -7,155 +7,34 @@ station are blanked.  Grids are written next to the figures as NetCDF and XYZ
 CSV so the maps can be re-made in any GIS.
 
 Background: hillshade of the Copernicus GLO-30 DEM (illumination from NW, 40 deg).
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import os
 
-import matplotlib
+import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import Normalize, TwoSlopeNorm
 
-matplotlib.use("Agg")
-import matplotlib.patheffects as pe  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap, Normalize, TwoSlopeNorm  # noqa: E402
-from matplotlib.ticker import FuncFormatter, MultipleLocator  # noqa: E402
+from ..common.mapping import (ANOM, EXTENT, GRID, HALO, HYPSO, INK, INK2, INST_COL, INST_LAB, TC_CMAP,
+                              UNC_CMAP, Basemap, apply_map_style, base100, colorbar, credit, inset_locator,
+                              north_arrow, scalebar, stations)
 
-from .geodata import hillshade  # noqa: E402
 
-EXTENT = (34.705, 35.025, 24.665, 24.850)  # lon0, lon1, lat0, lat1
+# -----------------------------------------------------------------------------
+# Gridding settings
 GRID_SPACING_M = 100.0
 BLOCK_M = 200.0
 MASK_KM = 2.0
-DPI = 400
-
-INK, INK2, GRID = "#1d1d1b", "#52514e", "#bdbcb6"
-INST_COL = {"CG6-0640": "#2a78d6", "CG6-0313": "#eb6834"}
-INST_LAB = {"CG6-0640": "CG-6 #0640", "CG6-0313": "CG-6 #0313"}
-SEA = "#cfe3f3"
-COAST = "#4a88c7"
-
-ANOM = LinearSegmentedColormap.from_list("anom", [
-    "#0b2f63", "#1c5cab", "#3987e5", "#86b6ef", "#d4e6f9", "#f6f5f1",
-    "#fbd4c4", "#f19274", "#e05a3c", "#b52a1d", "#6e1309"], N=256)
-HYPSO = LinearSegmentedColormap.from_list("hypso", [
-    "#e9e4cf", "#d9cfa6", "#c8b27c", "#b48f5c", "#956b45", "#734d33", "#4f3424", "#3a2a22"], N=256)
-TC_CMAP = LinearSegmentedColormap.from_list("tc", ["#fbf6ef", "#f3d6a8", "#e5a66a", "#c86d3c", "#8f3b1f", "#4e1a0c"])
-UNC_CMAP = LinearSegmentedColormap.from_list("unc", ["#d9ecd2", "#8cc58a", "#3f9b5c", "#1d6b45", "#0b3d2a"])
-
-plt.rcParams.update({
-    "font.family": "DejaVu Sans", "font.size": 8.5, "axes.titlesize": 10.5, "axes.titleweight": "bold",
-    "axes.labelsize": 8.5, "axes.edgecolor": INK, "axes.linewidth": 0.8, "xtick.color": INK2,
-    "ytick.color": INK2, "xtick.labelsize": 7.5, "ytick.labelsize": 7.5, "xtick.direction": "in",
-    "ytick.direction": "in", "xtick.top": True, "ytick.right": True, "savefig.dpi": DPI,
-    "savefig.bbox": "tight", "savefig.pad_inches": 0.08, "axes.grid": False, "legend.frameon": True,
-    "legend.framealpha": 0.92, "legend.edgecolor": GRID, "legend.fontsize": 7.5,
-})
-HALO = [pe.withStroke(linewidth=2.2, foreground="white")]
 
 
-# ----------------------------------------------------------------------------- helpers
-def _deg_fmt(hemi):
-    def f(v, _):
-        return f"{abs(v):.2f}°{hemi}"
-    return FuncFormatter(f)
-
-
-class Basemap:
-    def __init__(self, dem, extent=EXTENT):
-        self.extent = extent
-        lon0, lon1, lat0, lat1 = extent
-        j = (dem.lon >= lon0) & (dem.lon <= lon1)
-        i = (dem.lat >= lat0) & (dem.lat <= lat1)
-        self.z = dem.z[np.ix_(i, j)]
-        self.lon, self.lat = dem.lon[j], dem.lat[i]
-        dx = np.radians(dem.dx) * 6371008.8 * np.cos(np.radians(np.mean(self.lat)))
-        dy = np.radians(dem.dy) * 6371008.8
-        self.hs = hillshade(self.z, dx, dy, z_factor=1.6)
-        self.sea = self.z <= 0.5
-        self.dem = dem
-
-    def draw(self, ax, relief_alpha=0.55, tint=False, contours=False):
-        lon0, lon1, lat0, lat1 = self.extent
-        ext = (self.lon[0], self.lon[-1], self.lat[-1], self.lat[0])
-        if tint:
-            ax.imshow(np.ma.masked_where(self.sea, self.z), extent=ext, cmap=HYPSO, vmin=0, vmax=650,
-                      interpolation="bilinear", zorder=0)
-            ax.imshow(self.hs, extent=ext, cmap="gray", vmin=0, vmax=1, alpha=0.38, interpolation="bilinear", zorder=1)
-        else:
-            ax.imshow(self.hs, extent=ext, cmap="gray", vmin=-0.1, vmax=1.1, alpha=relief_alpha,
-                      interpolation="bilinear", zorder=0)
-        ax.imshow(np.ma.masked_where(~self.sea, np.ones_like(self.z)), extent=ext,
-                  cmap=LinearSegmentedColormap.from_list("s", [SEA, SEA]), interpolation="nearest", zorder=2)
-        ax.contour(self.lon, self.lat, self.z, levels=[0.5], colors=COAST, linewidths=0.7, zorder=3)
-        if contours:
-            cs = ax.contour(self.lon, self.lat, self.z, levels=np.arange(100, 1600, 100), colors="#6b5a4a",
-                            linewidths=0.35, alpha=0.6, zorder=3)
-            ax.clabel(cs, levels=cs.levels[::2], fmt="%d m", fontsize=5.5, inline=True)
-        ax.set_xlim(lon0, lon1)
-        ax.set_ylim(lat0, lat1)
-        frame(ax)
-
-
-def frame(ax, lat=24.76):
-    ax.set_aspect(1 / np.cos(np.radians(lat)))
-    ax.xaxis.set_major_locator(MultipleLocator(0.05))
-    ax.yaxis.set_major_locator(MultipleLocator(0.05))
-    ax.xaxis.set_major_formatter(_deg_fmt("E"))
-    ax.yaxis.set_major_formatter(_deg_fmt("N"))
-    ax.grid(True, color="white", lw=0.4, alpha=0.6, zorder=4)
-
-
-def scalebar(ax, km=(0, 2, 4, 6), loc=(0.04, 0.05)):
-    lon0, lon1 = ax.get_xlim()
-    lat0, lat1 = ax.get_ylim()
-    latc = lat0 + (lat1 - lat0) * loc[1]
-    deg_per_km = 1 / (111.32 * np.cos(np.radians(latc)))
-    x0 = lon0 + (lon1 - lon0) * loc[0]
-    h = (lat1 - lat0) * 0.011
-    for k in range(len(km) - 1):
-        ax.add_patch(plt.Rectangle((x0 + km[k] * deg_per_km, latc), (km[k + 1] - km[k]) * deg_per_km, h,
-                                   facecolor=INK if k % 2 == 0 else "white", edgecolor=INK, lw=0.6, zorder=20))
-    for v in km:
-        ax.text(x0 + v * deg_per_km, latc + 1.9 * h, f"{v}", ha="center", va="bottom", fontsize=6.5,
-                zorder=20, path_effects=HALO)
-    ax.text(x0 + km[-1] * deg_per_km + 0.6 * deg_per_km, latc + 0.5 * h, "km", va="center", fontsize=6.5,
-            zorder=20, path_effects=HALO)
-
-
-def north_arrow(ax, loc=(0.955, 0.86)):
-    ax.annotate("N", xy=(loc[0], loc[1] + 0.085), xytext=(loc[0], loc[1]), xycoords="axes fraction",
-                ha="center", va="center", fontsize=9, fontweight="bold", zorder=20,
-                arrowprops=dict(arrowstyle="-|>,head_width=0.35,head_length=0.7", color=INK, lw=1.4),
-                path_effects=HALO)
-
-
-def stations(ax, s, size=2.2, color=INK, alpha=0.75, zorder=12):
-    ax.scatter(s["lon"], s["lat"], s=size, c=color, lw=0, alpha=alpha, zorder=zorder)
-
-
-def base100(ax, ref, label=True):
-    b = ref["base_100"]
-    ax.plot(b["lon"], b["lat"], marker="*", ms=12, mfc="#ffd23f", mec=INK, mew=0.8, ls="", zorder=25)
-    if label:
-        ax.annotate("Base 100", (b["lon"], b["lat"]), xytext=(7, 6), textcoords="offset points", fontsize=7,
-                    fontweight="bold", zorder=25, path_effects=HALO)
-
-
-def credit(ax, text):
-    ax.text(0.0, -0.085, text, transform=ax.transAxes, fontsize=5.8, color=INK2, va="top", ha="left")
-
-
-def colorbar(fig, mappable, ax, label, ticks=None, extend="both", shrink=0.82):
-    cb = fig.colorbar(mappable, ax=ax, orientation="vertical", shrink=shrink, pad=0.018, aspect=28,
-                      extend=extend, ticks=ticks)
-    cb.set_label(label, fontsize=8)
-    cb.ax.tick_params(labelsize=7, direction="out")
-    cb.outline.set_linewidth(0.6)
-    return cb
-
-
-# ----------------------------------------------------------------------------- gridding
+# -----------------------------------------------------------------------------
+# Gridding
 class Gridder:
+    """Block-median + trend + biharmonic-spline gridding in UTM 36N, blanked > MASK_KM from the stations."""
     def __init__(self, extent=EXTENT, spacing=GRID_SPACING_M):
         import pyproj
         self.tr = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:32636", always_xy=True)
@@ -200,6 +79,7 @@ def _levels(v, step):
 
 def gridded_map(bm, gr, s, ref, col, title, unit_label, fname, fdir, cmap=ANOM, center=None, cstep=1.0,
                 subtitle="", vlim=None, gdir=None, note=""):
+    """Gridded anomaly map on the DEM relief with contours; also writes the grid as NetCDF and XYZ CSV."""
     LON, LAT, Z, g = gr.grid(s["lon"], s["lat"], s[col])
     fig, ax = plt.subplots(figsize=(8.6, 5.6))
     bm.draw(ax, relief_alpha=0.85)
@@ -237,35 +117,10 @@ def gridded_map(bm, gr, s, ref, col, title, unit_label, fname, fdir, cmap=ANOM, 
     return LON, LAT, Z
 
 
-def inset_locator(ia, dem, ref):
-    z = dem.z[::6, ::6]
-    hs = hillshade(z, 185.0, 185.0, z_factor=2)
-    ext = (dem.lon[0], dem.lon[-1], dem.lat[-1], dem.lat[0])
-    ia.imshow(np.ma.masked_where(z <= 0.5, z), extent=ext, cmap=HYPSO, vmin=0, vmax=900, zorder=0)
-    ia.imshow(hs, extent=ext, cmap="gray", alpha=0.35, zorder=1)
-    ia.imshow(np.ma.masked_where(z > 0.5, np.ones_like(z)), extent=ext,
-              cmap=LinearSegmentedColormap.from_list("s", [SEA, SEA]), zorder=2)
-    lon0, lon1, lat0, lat1 = EXTENT
-    ia.add_patch(plt.Rectangle((lon0, lat0), lon1 - lon0, lat1 - lat0, fill=False, ec="#b52a1d", lw=1.2, zorder=5))
-    ia.plot(34.87765, 25.06676, marker="s", ms=4, mfc="white", mec=INK, zorder=6)
-    ia.annotate("Station 0\n(hotel)", (34.87765, 25.06676), xytext=(4, -2), textcoords="offset points",
-                fontsize=5.5, va="top", path_effects=HALO)
-    ia.text(35.16, 24.62, "Red\nSea", fontsize=6, color=COAST, style="italic", ha="center")
-    ia.set_xlim(dem.lon[0], dem.lon[-1])
-    ia.set_ylim(dem.lat[-1], dem.lat[0])
-    ia.set_aspect(1 / np.cos(np.radians(24.76)))
-    ia.set_xticks([])
-    ia.set_yticks([])
-    ia.set_title("Location", fontsize=8.5, loc="left")
-    ia.text(0.02, 0.02, "red frame = map", transform=ia.transAxes, fontsize=5.8, color="#b52a1d")
-    for sp in ia.spines.values():
-        sp.set_edgecolor(INK)
-        sp.set_linewidth(0.8)
-    return ia
-
-
-# ----------------------------------------------------------------------------- the maps
+# -----------------------------------------------------------------------------
+# The maps
 def map_stations(bm, ctx, fdir):
+    """Map 1: station distribution by instrument, excluded occupations, DEM tint, legend and location inset."""
     occ, ref = ctx["occ"], ctx["ref"]
     f = occ[occ["role"] == "field"]
     fig = plt.figure(figsize=(11.0, 6.3))
@@ -310,6 +165,7 @@ def map_stations(bm, ctx, fdir):
 
 
 def map_points(bm, s, ref, col, title, label, fname, fdir, cmap, norm, subtitle="", note="", size=11, extend="both"):
+    """Map of a station quantity as coloured points on the DEM relief."""
     fig, ax = plt.subplots(figsize=(8.6, 5.6))
     bm.draw(ax, relief_alpha=0.85)
     o = s.sort_values(col, key=lambda v: np.abs(v))
@@ -328,6 +184,7 @@ def map_points(bm, s, ref, col, title, label, fname, fdir, cmap, norm, subtitle=
 
 
 def density_panel(bm, gr, s, ref, prefix, densities, title, fname, fdir, cstep=1.0, gdir=None):
+    """Four gridded maps of one anomaly type for four densities on a common colour scale."""
     cols = [f"{prefix}{r:.2f}_mgal" for r in densities]
     grids = [gr.grid(s["lon"], s["lat"], s[c]) for c in cols]
     allv = np.concatenate([g[2][np.isfinite(g[2])] for g in grids])
@@ -361,6 +218,8 @@ def density_panel(bm, gr, s, ref, prefix, densities, title, fname, fdir, cstep=1
 
 
 def make_all(ctx, fdir, gdir):
+    """Write maps map01-map11, their grids and the gridding cross-validation table; return the CV errors."""
+    apply_map_style()
     os.makedirs(fdir, exist_ok=True)
     os.makedirs(gdir, exist_ok=True)
     st, ref = ctx["st"], ctx["ref"]

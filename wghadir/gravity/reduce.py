@@ -5,6 +5,9 @@ Sign conventions (corrections are *added* to observed gravity unless stated):
   free-air            +FA(h)  with FA(h) = (0.3087691 - 0.0004398 sin^2 phi) h - 7.2125e-8 h^2
                       (second-order normal-gravity height gradient, Hinze et al. 2005)
   Bouguer slab        -2 pi G rho h = -0.04193 rho[g/cm3] h[m]
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import numpy as np
 
@@ -18,9 +21,11 @@ def normal_gravity_wgs84(lat_deg):
 
 
 def free_air_term(lat_deg, h_m):
+    """Second-order free-air term FA(h) [mGal] at latitude lat [deg] and height h [m]."""
     s2 = np.sin(np.radians(lat_deg)) ** 2
     return (0.3087691 - 0.0004398 * s2) * h_m - 7.2125e-8 * h_m ** 2
 
 
 def bouguer_slab(rho_gcc, h_m):
+    """Infinite-slab Bouguer effect 0.04193 rho h [mGal] for rho [g/cm3] and h [m]."""
     return BOUGUER_K * rho_gcc * h_m

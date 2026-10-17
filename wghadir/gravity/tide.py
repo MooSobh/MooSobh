@@ -9,6 +9,9 @@ Returned value is the *correction* in mGal that is added to an observed reading,
 i.e. minus the vertical tidal acceleration, with the Love-number style amplitude
 factor 1.16 used by the CG-6.  The sign is checked numerically against the
 instrument column in the processing log (see wghadir.qc.tide_check).
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import numpy as np
 import pandas as pd

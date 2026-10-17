@@ -1,4 +1,8 @@
-"""Nettleton density figures: one sheet per profile plus summary graphics."""
+"""Nettleton density figures: one sheet per profile plus summary graphics.
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
+"""
 import os
 
 import matplotlib
@@ -8,7 +12,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap, Normalize  # noqa: E402
 
-from . import maps  # noqa: E402  (shared style, basemap and helpers)
+from ..common import mapping as maps  # noqa: E402  (shared style, basemap and helpers)
+from .figures import apply_qc_style  # noqa: E402
 
 RHO_LINES = np.round(np.arange(2.0, 3.01, 0.1), 2)
 DENS_CMAP = LinearSegmentedColormap.from_list("dens", ["#9ec5f4", "#3987e5", "#1c5cab", "#4a3aa7", "#2b1b6b"])
@@ -101,6 +106,7 @@ def _profile_sheet(p, sw, res, bm, s_all, fdir):
 
 
 def summary_forest(net, cons, fdir):
+    """Forest plot of the profile densities (regression +/- 95 % bootstrap interval) for both methods."""
     keep = net.groupby("profile_id")["rho_regression_se"].min() < 2.5
     profiles = (net[(net["method"] == "complete") & net["profile_id"].isin(keep[keep].index)]
                 .sort_values("rho_regression")["profile_id"].tolist())
@@ -136,6 +142,7 @@ def summary_forest(net, cons, fdir):
 
 
 def windows_map(bm, win, s_all, ref, fdir):
+    """Map of the 3 km window density estimates."""
     w = win[(win["method"] == "complete") & (win["rho_se"] < 1.0)]
     fig, ax = plt.subplots(figsize=(8.6, 5.6))
     bm.draw(ax, relief_alpha=0.85)
@@ -158,6 +165,7 @@ def windows_map(bm, win, s_all, ref, fdir):
 
 
 def windows_hist(win, cons, fdir):
+    """Histogram of the 3 km window density estimates."""
     fig, ax = plt.subplots(figsize=(7.2, 3.6))
     bins = np.arange(0.0, 5.01, 0.2)
     for method, col in (("simple", SIMPLE_COL), ("complete", COMPLETE_COL)):
@@ -175,6 +183,8 @@ def windows_hist(win, cons, fdir):
 
 
 def make_all(ctx, fdir):
+    """Write one Nettleton sheet per profile and the three summary figures."""
+    apply_qc_style()
     os.makedirs(fdir, exist_ok=True)
     prof, sweeps, net, win, cons, st, ref = (ctx[k] for k in ("prof", "sweeps", "net", "win", "cons", "st", "ref"))
     bm = maps.Basemap(ctx["dem"])

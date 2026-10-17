@@ -1,4 +1,8 @@
-"""Reader for Scintrex CG-6 survey exports (tab-delimited .dat with '/' header)."""
+"""Reader for Scintrex CG-6 survey exports (tab-delimited .dat with '/' header).
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
+"""
 import hashlib
 import os
 import re
@@ -14,6 +18,7 @@ OVERFLOW = "******"
 
 
 def sha256(path):
+    """SHA-256 checksum of a file (inventory and provenance)."""
     h = hashlib.sha256()
     with open(path, "rb") as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b""):

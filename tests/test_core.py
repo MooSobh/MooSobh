@@ -1,11 +1,14 @@
-"""Regression tests: run with  python -m pytest -q"""
+"""Regression tests: run with  python -m pytest -q
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+"""
 import os
 
 import numpy as np
 import pytest
 
-from wghadir import cg6, gnss, reduce
-from wghadir.tide import longman_correction
+from wghadir.gravity import cg6, gnss, reduce, settings
+from wghadir.gravity.tide import longman_correction
 
 RAW = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 
@@ -36,3 +39,33 @@ def test_corrgrav_is_sum_of_terms(fname):
     _, d = cg6.read_cg6(os.path.join(RAW, fname), "x")
     r = d["CorrGrav"] - (d["RawGrav"] + d["TideCorr"] + d["TiltCorr"] + d["TempCorr"] + d["DriftCorr"])
     assert np.nanmax(np.abs(r)) <= 0.00021
+
+
+def test_chains_expose_numbered_steps():
+    from wghadir.chains import GravityChain, MagneticChain
+    for chain, n in ((GravityChain, 14), (MagneticChain, 8)):
+        assert len(chain.STEPS) == n
+        assert all(hasattr(chain, s) for s in chain.STEPS)
+        assert [int(s[4:6]) for s in chain.STEPS] == list(range(1, n + 1))
+
+
+def test_settings_documented_values():
+    assert settings.THRESHOLDS["stddev_reject_mgal"] == 0.080
+    assert settings.MATCH_MAX_M == 30.0
+    assert 2.67 in settings.RHO_LIST
+
+
+def test_terrain_flat_dem_matches_slab():
+    """Flat DEM of height h: the prism model (22 km, curvature) must approach the slab 0.04193 h."""
+    from types import SimpleNamespace
+
+    from wghadir.gravity.terrain import TopoModel
+
+    h, lon0, lat0, d = 100.0, 34.87, 24.78, 1.0 / 3600
+    lon = np.arange(lon0 - 0.26, lon0 + 0.26, d)
+    lat = np.arange(lat0 + 0.24, lat0 - 0.24, -d)
+    grid = SimpleNamespace(lon=lon, lat=lat, z=np.full((lat.size, lon.size), h), dx=d, dy=d)
+    model = TopoModel(grid)
+    g1 = model.unit_effect(lon0, lat0, h)[0]
+    assert model.coverage_ok(lon0, lat0)
+    assert g1 / (0.04193 * h) == pytest.approx(1.0, abs=0.01)

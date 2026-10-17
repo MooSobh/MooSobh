@@ -1,0 +1,36 @@
+# Conda environment for the Wadi Ghadir gravity and magnetic processing chains.
+# Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+#
+#   conda env create -f environment.yml        (or: mamba env create -f environment.yml)
+#   conda activate wghadir
+#   python -m pytest -q                        # quick check of the installation
+#   jupyter lab notebooks/                     # step-by-step notebooks
+#   python scripts/run_all.py                  # or the complete chains from the command line
+#
+# Tested with Python 3.11, numpy 2.4, pandas 3.0, verde 1.9, harmonica 0.7, xrft 1.0, ppigrf 2.1.
+name: wghadir
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.24
+  - pandas>=2.0
+  - scipy>=1.10
+  - openpyxl>=3.1         # formatted Excel workbooks
+  - matplotlib>=3.7
+  - pillow>=9             # down-scaled figures in the notebooks / HTML report
+  - rasterio>=1.3         # Copernicus DEM and EGM2008 windows (cloud-optimised GeoTIFF)
+  - pyproj>=3.5           # UTM 36N for gridding and the Excel coordinates
+  - xarray>=2023.1
+  - verde>=1.8            # block-median + biharmonic-spline gridding, cross-validation
+  - harmonica>=0.7        # prism terrain correction, FFT reduction to the pole
+  - xrft>=1.0             # grid padding for the FFT
+  - markdown>=3.4         # HTML report build
+  - jupyterlab
+  - ipykernel
+  - nbconvert
+  - pytest>=7
+  - pip
+  - pip:
+      - ppigrf>=2.1       # IGRF-14 main field (magnetic anomaly)
+      - -e .              # installs the wghadir package itself (pyproject.toml)

@@ -10,6 +10,9 @@ and cached under data/external/ so the processing is repeatable offline.
   exist (open sea) are filled with 0 m and flagged in the provenance file.
 * EGM2008 2.5' geoid undulation grid from the PROJ-data repository
   (us_nga_egm08_25.tif, public domain, NGA).
+
+Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
+Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import json
 import os
@@ -83,6 +86,7 @@ def fetch_dem(bounds, out_path):
 
 
 def fetch_geoid(bounds, out_path, pad=0.25):
+    """Cache the EGM2008 geoid-undulation window covering bounds (+ pad degrees) as a GeoTIFF at out_path; return the path."""
     import rasterio
     from rasterio.windows import from_bounds
 
@@ -131,6 +135,7 @@ class Grid:
 
 
 def hillshade(z, dx_m, dy_m, azimuth=315.0, altitude=40.0, z_factor=1.0):
+    """Hillshade (0-1) of a height grid with cell sizes dx_m, dy_m; light from azimuth and altitude [deg]."""
     gy, gx = np.gradient(z * z_factor, dy_m, dx_m)
     slope = np.pi / 2 - np.arctan(np.hypot(gx, gy))
     aspect = np.arctan2(-gx, gy)
