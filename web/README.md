@@ -22,3 +22,17 @@ python scripts/build_gravity_lab.py            # writes web/Wadi_Ghadir_Gravity_
 
 `tests/test_core.py::test_web_lab_engine_matches_python` runs `engine.js` in Node and checks it against the
 Python results.
+
+## Loading new data
+
+Chapter 2.1 of the lab accepts, together or separately:
+
+* Scintrex CG-6 survey exports (`.dat`, as written by the meter);
+* readings tables from any relative gravimeter (`.csv`): columns `date`, `time` (UTC), `station`, `gravity` [mGal],
+  optional `line`, `instrument`, `stddev`, `tilt_x`, `tilt_y`, `tidecorr`, `lat`, `lon`;
+* a station table (`.csv`): `station`, `lat`, `lon`, `H` (or `h` and `N`), optional `line`, `date`, `instrument`,
+  `u_topo` or `tc`. Include the base station with its adopted coordinates.
+
+`web/examples/` holds a ready-made pair to try: the Wadi Ghadir CG-6 #0640 readings as a readings table and its
+station table. Loading them reproduces the Python complete Bouguer anomalies of those 531 stations to 0.2 µGal
+(`tests/test_core.py::test_web_lab_accepts_uploaded_readings_table`).

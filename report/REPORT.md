@@ -556,7 +556,7 @@ The processing is a Python package (`wghadir`) with two chain classes whose numb
 
 ```bash
 conda env create -f environment.yml && conda activate wghadir   # or: python -m pip install -r requirements.txt
-python -m pytest -q                       # installation check (13 tests)
+python -m pytest -q                       # installation check (14 tests)
 python scripts/run_all.py                 # gravity steps 1-14, then magnetics steps 1-8 (~5 min)
 jupyter lab notebooks/                    # the same chains step by step, with tables and figures
 python scripts/build_report_html.py       # report/REPORT.html

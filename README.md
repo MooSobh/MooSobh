@@ -20,7 +20,7 @@ With conda or mamba (recommended: rasterio and pyproj come with their binary lib
 ```bash
 conda env create -f environment.yml
 conda activate wghadir
-python -m pytest -q              # 13 tests, about 10 s
+python -m pytest -q              # 14 tests, about 10 s
 ```
 
 With pip, using an existing Python ≥ 3.10:

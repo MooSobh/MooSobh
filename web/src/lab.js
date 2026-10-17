@@ -1,10 +1,16 @@
 /* ===== Wadi Ghadir Gravity Lab: chapters, maps and interaction =====
-   Prepared by Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics), Hannover. */
+   Written by Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics), Hannover. */
 (function () {
 "use strict";
 document.body.classList.add("appA");
+const AUTHOR = "Mohamed Sobh, LIAG";
+/* a clean copy of this page, taken before anything is drawn, for "Save this lab as HTML" */
+const PAGE_HTML = (() => { const d = document.documentElement.cloneNode(true);
+  d.querySelectorAll("script").forEach(sc => { if (!sc.textContent.includes("const WG_DATA")) sc.remove(); });
+  return "<!DOCTYPE html>\n" + d.outerHTML; })();
 
 /* ---------------------------------------------------------------- data and state */
+const HERO = { t0: performance.now(), vis: true };
 const EXAMPLE = {
   name: "Wadi Ghadir example data", example: true, files: WG_DATA.files,
   stations: WG_DATA.stations.map(r => Object.fromEntries(WG_DATA.stationCols.map((c, i) => [c, r[i]]))),
@@ -69,7 +75,8 @@ function colorBar(cv, pal, lo, hi, unit) {
 function mapExtent() {
   const h = LAB.input.hill;
   if (h) return { lon0: h.lon0, lon1: h.lon1, lat0: h.lat0, lat1: h.lat1 };
-  const s = R() ? R().occ.filter(o => isF(o.lat)) : [];
+  let s = R() ? R().occ.filter(o => isF(o.lat) && o.role !== "hotel") : [];   // a distant second base would stretch the map
+  if (!s.length && R()) s = R().occ.filter(o => isF(o.lat));
   if (!s.length) return { lon0: 34.7, lon1: 35.03, lat0: 24.66, lat1: 24.85 };
   let lo0 = Math.min(...s.map(o => o.lon)), lo1 = Math.max(...s.map(o => o.lon)), la0 = Math.min(...s.map(o => o.lat)), la1 = Math.max(...s.map(o => o.lat));
   const px = (lo1 - lo0) * 0.08 + 0.005, py = (la1 - la0) * 0.08 + 0.005;
@@ -201,13 +208,13 @@ function paintOverview() {
 }
 
 /* ---------- 2.1 load data ---------- */
-CH.push({ id: "2.1", sec: "data", short: "Load the data", title: "Load the CG-6 files and the station table",
-  tag: "Start from the Wadi Ghadir example, or drop in your own Scintrex CG-6 survey exports and a CSV of station coordinates. Everything else updates automatically.",
-  goal: "load raw CG-6 data and station coordinates, and check the inventory.",
+CH.push({ id: "2.1", sec: "data", short: "Load the data", title: "Load gravity readings and station coordinates",
+  tag: "Start from the Wadi Ghadir example, or load your own data: Scintrex CG-6 survey exports or a readings table from any gravimeter, plus a CSV of station coordinates. Every chapter then works on your data.",
+  goal: "load a new data set, check the inventory and run the whole chain on it.",
   figs: [
     { title: "Data source", sub: "Your files stay in your browser; nothing is uploaded anywhere.",
-      html: () => `<div class="drop big" id="dz"><div class="fileline"><b>1 · CG-6 survey exports (.dat, .txt)</b><input type="file" id="fDat" multiple accept=".dat,.txt,.csv"></div>
-        <div class="fileline"><b>2 · Station coordinates (.csv), optional</b><input type="file" id="fSt" accept=".csv,.txt"></div>
+      html: () => `<div class="drop big" id="dz"><div class="fileline"><b>1 · Gravity readings: CG-6 exports (.dat) or readings tables (.csv)</b><input type="file" id="fDat" multiple accept=".dat,.txt,.csv,.tsv"></div>
+        <div class="fileline"><b>2 · Station coordinates (.csv)</b><input type="file" id="fSt" accept=".csv,.txt,.tsv"></div>
         <div class="fileline">${chk("cgGps", "Where the table has no entry, use the CG-6 internal GPS position (heights from that GPS are poor)", P().pos.allowCg6Gps)}</div>
         <div class="row"><button class="tbtn go" type="button" id="bRun">Process my files</button><button class="tbtn" type="button" id="bEx">Reload the Wadi Ghadir example</button><span class="hint">or drop the files on this box</span></div></div>
         <div class="msg" id="loadMsg" aria-live="polite"></div>`,
@@ -220,17 +227,25 @@ CH.push({ id: "2.1", sec: "data", short: "Load the data", title: "Load the CG-6 
         bindChk("cgGps", v => { P().pos.allowCg6Gps = v; changed(); });
         onPaint(() => { const m = $("loadMsg"); if (!m) return; if (LAB.error) { m.className = "msg bad"; m.innerHTML = "<b>Could not process the data.</b> " + esc(LAB.error); } else { m.className = "msg ok"; m.innerHTML = `<b>${esc(LAB.input.name)}</b>: ${R().rows.length} readings, ${R().occ.length} occupations, ${okSt().length} stations with position and drift control.`; } });
       } },
-    { title: "Inventory", sub: "One row per CG-6 file, read from its header.", html: () => `<div class="scroll"><table class="t" id="invT"></table></div>`,
+    { title: "Inventory", sub: "One row per loaded readings file (CG-6 header values where available).", html: () => `<div class="scroll"><table class="t" id="invT"></table></div>`,
       draw() { onPaint(() => { const t = $("invT"); if (!t || !R()) return; t.innerHTML = `<tr><th>File</th><th>Instrument</th><th>Serial</th><th>Readings</th><th>First</th><th>Last</th><th>Gcal1 [mGal]</th><th>Drift rate [mGal/day]</th><th>Firmware</th></tr>` + R().files.map(f => { const ts = f.rows.map(r => r.t).filter(isF); return `<tr><td>${esc(f.name)}</td><td>${esc(f.inst)}</td><td class="n">${esc(f.serial)}</td><td class="n">${f.rows.length}</td><td class="n">${new Date(Math.min(...ts)).toISOString().slice(0, 16).replace("T", " ")}</td><td class="n">${new Date(Math.max(...ts)).toISOString().slice(0, 16).replace("T", " ")}</td><td class="n">${esc(f.header["Gcal1 [mGal]"] || "–")}</td><td class="n">${esc(f.header["Drift Rate [mGal/day]"] || "–")}</td><td>${esc(f.header["Firmware Version"] || "–")}</td></tr>`; }).join(""); }); } },
-    { title: "Station table format", sub: "Comma, semicolon or tab separated; the first row holds the column names (any letter case).",
-      html: () => `<pre class="code">line,station,lat,lon,H,u_topo
-1,1,24.8244463,34.9962460,3.85,0.00241
-1,2,24.8229031,34.9950070,6.54,0.00911</pre>
-        <p class="hint"><b>Required:</b> station, lat, lon (WGS84 degrees) and H (orthometric height, m), or h and N (ellipsoidal height and geoid undulation). <b>Optional:</b> line, date (YYYY-MM-DD) and instrument (for example CG6-0640), to tell repeated station numbers apart; u_topo (unit terrain effect relative to base, mGal per g/cm³) or tc (terrain correction at 2.67 g/cm³, mGal) for the complete Bouguer anomaly.</p>
-        <div class="row"><button class="tbtn" type="button" id="bTpl">Copy the Wadi Ghadir table as a template</button><span class="hint" id="tplMsg"></span></div>`,
-      draw() { $("bTpl").onclick = () => copyText(["instrument,date,line,station,lat,lon,H,u_topo", ...EXAMPLE.stations.map(s => [s.inst, s.date, s.line, s.station, s.lat, s.lon, s.H, s.u].join(","))].join("\n"), $("tplMsg")); } },
+    { title: "File formats", sub: "Tables may be comma, semicolon or tab separated; the first row holds the column names (any letter case). Lines starting with # are skipped.",
+      html: () => `<p class="ptitle small">Gravity readings, option A: Scintrex CG-6 survey export</p><p class="hint">The .dat file as the CG-6 writes it. The instrument name comes from its serial number.</p>
+        <p class="ptitle small">Gravity readings, option B: readings table (any gravimeter)</p>
+        <pre class="code">instrument,date,time,line,station,gravity,stddev
+CG5-1234,2026-03-02,07:31:10,0,100,4021.317,0.012
+CG5-1234,2026-03-02,07:52:40,1,1,4019.882,0.015</pre>
+        <p class="hint"><b>Required:</b> date (YYYY-MM-DD), time (UTC), station and gravity in mGal (also accepted: reading, g, corrgrav), or one datetime column. <b>Optional:</b> line, instrument (otherwise the file name), stddev, tilt_x, tilt_y, tidecorr (a tide already contained in gravity, mGal; it is replaced by the tide chosen in 3.2) and lat, lon of each reading. Without lat and lon, the tide is computed at the station position from the station table.</p>
+        <p class="ptitle small">Station coordinates</p>
+        <pre class="code">line,station,lat,lon,H,u_topo
+0,100,24.7867488,34.9337552,99.889,0
+1,1,24.8244463,34.9962460,3.85,0.00241</pre>
+        <p class="hint"><b>Required:</b> station, lat, lon (WGS84 degrees) and H (orthometric height, m), or h and N (ellipsoidal height and geoid undulation). Include the base station. <b>Optional:</b> line, date and instrument, to tell repeated station numbers apart; u_topo (terrain effect relative to the base, mGal per g/cm³) or tc (terrain correction at 2.67 g/cm³, mGal) for the complete Bouguer anomaly.</p>
+        <div class="row"><button class="tbtn" type="button" id="bTplR">Copy an example readings table</button><button class="tbtn" type="button" id="bTpl">Copy the Wadi Ghadir station table</button><span class="hint" id="tplMsg"></span></div>`,
+      draw() { $("bTpl").onclick = () => copyText(["instrument,date,line,station,lat,lon,H,u_topo", ...EXAMPLE.stations.map(s => [s.inst, s.date, s.line, s.station, s.lat, s.lon, s.H, s.u].join(","))].join("\n"), $("tplMsg"));
+        $("bTplR").onclick = () => copyText(exampleReadings(), $("tplMsg")); } },
   ],
-  ideas: [["layers", "CG-6 export", "The tab-separated survey file of the CG-6 (one row per reading). The instrument name is taken from the serial number in its header."],
+  ideas: [["layers", "Readings", "A CG-6 survey export as it comes from the meter, or a simple table (date, time, station, gravity) from any relative gravimeter. Several files and several instruments can be loaded together."],
     ["map", "Station table", "Positions and heights come from your GNSS processing. The base station must be in the table too, or its position is taken from the CG-6 GPS."],
     ["check", "Base station", "Set the line and station of your field base in chapter 3.3 (Wadi Ghadir: line 0, station 100)."]],
   notes: [NOTE("warn", "Heights decide the accuracy", "<p>1 cm of height error gives about 2 µGal of error in the Bouguer anomaly. The CG-6 internal GPS is accurate only to several metres, so use it only to look at the data, never for final products.</p>")],
@@ -238,20 +253,31 @@ CH.push({ id: "2.1", sec: "data", short: "Load the data", title: "Load the CG-6 
 function readFiles(list) {
   const msg = $("loadMsg"); if (!list.length) { msg.className = "msg bad"; msg.innerHTML = "<b>No files chosen.</b> Choose at least one CG-6 export."; return; }
   Promise.all(list.map(f => f.text().then(t => ({ name: f.name, text: t })))).then(fs => {
-    const dat = [], csv = [];
-    fs.forEach(f => (/^\/\s*CG-6|\/Station\t/m.test(f.text) ? dat : csv).push(f));
-    if (!dat.length) { msg.className = "msg bad"; msg.innerHTML = "<b>No CG-6 export found.</b> A CG-6 survey file has header lines starting with “/” and a “/Station” column line."; return; }
+    const kind = f => { if (/^\/\s*CG-6|^\/Station\t/m.test(f.text)) return "cg6";
+      const h = (f.text.split(/\r?\n/).find(l => l.trim() && !l.startsWith("#")) || "").toLowerCase();
+      return /(^|[,;\t])\s*"?(gravity|reading|g|corrgrav|gobs|mgal)"?\s*([,;\t]|$)/.test(h) && /(date|datetime|timestamp)/.test(h) ? "readings" : "stations"; };
+    const dat = fs.filter(f => kind(f) !== "stations"), csv = fs.filter(f => kind(f) === "stations");
+    if (!dat.length) { msg.className = "msg bad"; msg.innerHTML = "<b>No gravity readings found.</b> Add CG-6 survey exports or a readings table with the columns date, time, station and gravity (see the formats below)."; return; }
     let stations = [];
-    for (const c of csv) stations = stations.concat(ENG.normaliseStations(ENG.parseCSV(c.text)));
+    try { for (const c of csv) stations = stations.concat(ENG.normaliseStations(ENG.parseCSV(c.text))); }
+    catch (e) { msg.className = "msg bad"; msg.innerHTML = "<b>Could not read the station table.</b> " + esc(e.message); return; }
+    if (csv.length && !stations.length) { msg.className = "msg bad"; msg.innerHTML = `<b>${esc(csv.map(f => f.name).join(", "))}: no station coordinates found.</b> The station table needs the columns station, lat, lon and H.`; return; }
     LAB.input = { name: dat.map(f => f.name).join(", "), files: dat, stations, ref: null, hill: null, python: null };
-    afterLoad(`${dat.length} CG-6 file(s)` + (csv.length ? ` and ${stations.length} station coordinates` : ", no station table") + " loaded.");
+    const nC = dat.filter(f => kind(f) === "cg6").length, nR = dat.length - nC;
+    afterLoad([nC ? `${nC} CG-6 file(s)` : "", nR ? `${nR} readings table(s)` : ""].filter(Boolean).join(" and ") + (csv.length ? ` and ${stations.length} station coordinates` : ", no station table") + " loaded.");
   });
 }
 function afterLoad(text) {
-  compute(); LAB.gridKey = ""; updateBadge(); repaint();
-  const m = $("loadMsg"); if (m && !LAB.error) { m.className = "msg ok"; m.innerHTML = `<b>${esc(text)}</b> ${R().rows.length} readings, ${R().occ.length} occupations, ${okSt().length} stations ready for reduction.` + (okSt().length ? "" : " No station has a position yet: add a station table or allow the CG-6 GPS."); }
+  compute(); LAB.gridKey = ""; LAB.grid = null;
+  // new data inside the Wadi Ghadir relief window keep the relief background
+  if (!LAB.input.example && R()) { const h = EXAMPLE.hill, f = R().occ.filter(o => isF(o.lat) && o.role !== "hotel");
+    LAB.input.hill = f.length && f.every(o => o.lon >= h.lon0 && o.lon <= h.lon1 && o.lat >= h.lat0 && o.lat <= h.lat1) ? h : null; }
+  updateBadge(); if (HERO.W) heroSize(); repaint();
+  if (LAB.error) { const m = $("loadMsg"); if (m) { m.className = "msg bad"; m.innerHTML = "<b>Could not process the data.</b> " + esc(LAB.error); } return; }
+  const m = $("loadMsg"); if (m && !LAB.error) { m.className = "msg ok"; m.innerHTML = `<b>${esc(text)}</b> ${R().rows.length} readings, ${R().occ.length} occupations, ${okSt().length} stations ready for reduction.` + (okSt().length ? "" : " No station has a position yet: add a station table or allow the CG-6 GPS.")
+    + (R().occ.some(o => o.role === "base") ? "" : ` <b>No reading at the base station (line ${esc(P().base.line || "–")}, station ${esc(P().base.station)}) was found:</b> set your base station in chapter 3.3.`); }
 }
-function updateBadge() { $("dataBadge").textContent = LAB.input.example ? "Wadi Ghadir example data" : "your data: " + LAB.input.files.length + " file(s)"; heroStats(); }
+function updateBadge() { $("dataBadge").textContent = LAB.input.example ? "· Wadi Ghadir example data" : "· your data: " + LAB.input.files.length + " file(s)"; heroStats(); }
 function heroStats() {
   if (!R()) return; const r = R();
   $("heroStats").innerHTML = `<div class="hstat"><b>${r.rows.length.toLocaleString("en-US").replace(",", " ")}</b><span>CG-6 readings</span></div><div class="hstat"><b>${okSt().length}</b><span>field stations</span></div><div class="hstat"><b>${days().length}</b><span>survey days${LAB.input.example ? ", Jan 2026" : ""}</span></div>`;
@@ -615,13 +641,13 @@ CH.push({ id: "6.2", sec: "out", short: "Export and parameters", title: "Export 
   goal: "save the results of your run and the settings that produced them.",
   figs: [
     { title: "Results", sub: "Each button offers a file to save. The map image is also shown below the buttons.",
-      html: () => `<div class="row"><button class="tbtn go" type="button" id="xSt">Station table (CSV)</button><button class="tbtn" type="button" id="xGr">Grid (XYZ CSV)</button><button class="tbtn" type="button" id="xPng">Map image (PNG)</button><button class="tbtn" type="button" id="xCopy">Copy station table</button></div><p class="hint" id="xMsg"></p><img id="xImg" alt="Exported map" hidden style="width:100%;border-radius:12px;margin-top:8px">` ,
+      html: () => `<div class="row"><button class="tbtn go" type="button" id="xSt">Station table (CSV)</button><button class="tbtn" type="button" id="xGr">Grid (XYZ CSV)</button><button class="tbtn" type="button" id="xPng">Map image (PNG)</button><button class="tbtn" type="button" id="xCopy">Copy station table</button><button class="tbtn" type="button" id="xHtml">This lab (HTML)</button></div><p class="hint" id="xMsg"></p><img id="xImg" alt="Exported map" hidden style="width:100%;border-radius:12px;margin-top:8px">` ,
       draw() { $("xSt").onclick = () => saveFile("wadi_ghadir_stations.csv", stationCSV(), "text/csv"); $("xGr").onclick = () => { const t = gridCSV(); if (t) saveFile("wadi_ghadir_grid.csv", t, "text/csv"); else $("xMsg").textContent = "Compute a grid in chapter 5.1 first."; };
-        $("xPng").onclick = exportPng; $("xCopy").onclick = () => copyText(stationCSV(), $("xMsg")); } },
+        $("xPng").onclick = exportPng; $("xCopy").onclick = () => copyText(stationCSV(), $("xMsg")); $("xHtml").onclick = () => saveFile("Wadi_Ghadir_Gravity_Lab.html", PAGE_HTML, "text/html"); } },
     { title: "Parameter set", sub: "All processing parameters of this run (JSON). Edit or paste a set and press Apply.",
       html: () => `<textarea class="code" id="pJ" spellcheck="false" aria-label="Parameters as JSON"></textarea><div class="row"><button class="tbtn go" type="button" id="pA">Apply</button><button class="tbtn" type="button" id="pC">Copy</button><button class="tbtn" type="button" id="pD">Restore the defaults</button><span class="hint" id="pM"></span></div>`,
-      draw() { $("pJ").value = JSON.stringify(P(), null, 1);
-        $("pA").onclick = () => { try { LAB.P = ENG.mergeParams(JSON.parse($("pJ").value)); changed(); $("pM").textContent = "Applied."; } catch (e) { $("pM").textContent = "This is not valid JSON: " + e.message; } };
+      draw() { $("pJ").value = JSON.stringify(Object.assign({ written_by: AUTHOR }, P()), null, 1);
+        $("pA").onclick = () => { try { const j = JSON.parse($("pJ").value); delete j.written_by; LAB.P = ENG.mergeParams(j); changed(); $("pM").textContent = "Applied."; } catch (e) { $("pM").textContent = "This is not valid JSON: " + e.message; } };
         $("pC").onclick = () => copyText($("pJ").value, $("pM")); $("pD").onclick = () => { LAB.P = ENG.mergeParams({}); $("pJ").value = JSON.stringify(P(), null, 1); changed(); $("pM").textContent = "Defaults restored."; }; } },
     { title: "Software and sources", sub: "",
       html: () => `<ul class="refs"><li>Processing chain: <i>wghadir</i> Python package (this project), ported to JavaScript for this lab; Python notebooks 01–03 run the same steps with Harmonica, Verde, Boule, Choclo (Fatiando a Terra), pygtide/ETERNA, SGTool and PyGMT.</li><li>Physics core and page design: <i>Static Gravity Lab</i> by Mohamed Sobh, LIAG.</li><li>Longman, I. M. (1959). Formulas for computing the tidal accelerations due to the Moon and the Sun. <i>JGR</i> 64.</li><li>Hinze, W. J. et al. (2005). New standards for reducing gravity data. <i>Geophysics</i> 70.</li><li>Nettleton, L. L. (1939). Determination of density for reduction of gravimeter observations. <i>Geophysics</i> 4.</li><li>Sandwell, D. T. (1987). Biharmonic spline interpolation of GEOS-3 and SEASAT altimeter data. <i>GRL</i> 14.</li><li>Copernicus DEM GLO-30 © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA.</li></ul>`,
@@ -630,12 +656,17 @@ CH.push({ id: "6.2", sec: "out", short: "Export and parameters", title: "Export 
   ideas: [["check", "Reproducible", "The parameter set and the input files fully define a run. Keep them with the results."],
     ["layers", "Columns", "The station table holds positions, heights, Δg₁₀₀, ΔFA, ΔSB and ΔCB for the current density, uncertainties and the drift mode of each station."]],
 });
+/* the CG-6 readings of the example as a generic readings table (CorrGrav without the on-board tide) */
+function exampleReadings() {
+  const rows = ENG.parseCG6(EXAMPLE.files[0].text, EXAMPLE.files[0].name).rows;
+  return ["instrument,date,time,line,station,gravity,stddev,tilt_x,tilt_y,lat,lon"].concat(rows.filter(r => isF(r.CorrGrav)).map(r => [r.inst, r.Date, r.Time, r.Line, r.Station, (r.CorrGrav - r.TideCorr).toFixed(4), r.StdDev, r.X, r.Y, r.LatGPS, r.LonGPS].join(","))).join("\n");
+}
 function stationCSV() {
   const rho = P().red.rho, head = ["key", "instrument", "date", "line", "station", "lat", "lon", "H_m", "dH_m", "dg100_mGal", "sigma_mGal", "scale_k", "drift_mode", "FA_mGal", `SB_${rho.toFixed(2)}_mGal`, `CB_${rho.toFixed(2)}_mGal`, "u_topo"];
-  return [head.join(",")].concat(okSt().map(s => [s.key, s.inst, s.date, s.line, s.station, s.lat.toFixed(7), s.lon.toFixed(7), s.H.toFixed(3), s.dh.toFixed(3), s.dgk.toFixed(4), s.dgs.toFixed(4), s.k.toFixed(6), s.drift, s.dFA.toFixed(4), ENG.SB(s, rho).toFixed(4), isF(s.uTopo) ? ENG.CB(s, rho).toFixed(4) : "", isF(s.uTopo) ? s.uTopo.toFixed(5) : ""].join(","))).join("\n");
+  return [`# Wadi Ghadir Gravity Lab, written by ${AUTHOR}. Data: ${LAB.input.name}. Values relative to the base station.`, head.join(",")].concat(okSt().map(s => [s.key, s.inst, s.date, s.line, s.station, s.lat.toFixed(7), s.lon.toFixed(7), s.H.toFixed(3), s.dh.toFixed(3), s.dgk.toFixed(4), s.dgs.toFixed(4), s.k.toFixed(6), s.drift, s.dFA.toFixed(4), ENG.SB(s, rho).toFixed(4), isF(s.uTopo) ? ENG.CB(s, rho).toFixed(4) : "", isF(s.uTopo) ? s.uTopo.toFixed(5) : ""].join(","))).join("\n");
 }
 function gridCSV() {
-  const G = LAB.grid; if (!G) return null; const out = ["lon,lat,x_local_m,y_local_m,value"];
+  const G = LAB.grid; if (!G) return null; const out = [`# Wadi Ghadir Gravity Lab, written by ${AUTHOR}. Grid of ${QTY[G.q][0]}${G.q === "SB" || G.q === "CB" ? ", rho " + P().red.rho.toFixed(2) : ""} [mGal].`, "lon,lat,x_local_m,y_local_m,value"];
   for (let r = 0; r < G.ny; r++) for (let c = 0; c < G.nx; c++) { const i = r * G.nx + c; if (!G.mask[i]) continue; const x = G.x0 + c * G.cell, y = G.y0 + r * G.cell, [la, lo] = G.local.inv(x, y); out.push([lo.toFixed(6), la.toFixed(6), x.toFixed(1), y.toFixed(1), G.z[i].toFixed(4)].join(",")); }
   return out.join("\n");
 }
@@ -644,7 +675,7 @@ function gridCSV() {
 let DL = null;
 if (window.claude && window.claude.use) window.claude.use("downloads").then(d => { DL = d; }, () => { DL = null; });
 function saveFile(name, data, type) {
-  const msg = $("xMsg");
+  const msg = $("xMsg") || $("heroMsg") || { set textContent(v) { /* no message area here */ } };
   if (DL) { DL.save({ filename: name, data }).then(() => { msg.textContent = name + " saved."; }, e => { msg.textContent = e && e.code === "declined" ? "Saving was cancelled." : "This view cannot save files: use Copy."; }); return; }
   if (window.claude) { msg.textContent = "Saving files is not available in this view: use Copy."; return; }
   try { const a = document.createElement("a"); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); msg.textContent = name + " saved."; }
@@ -655,13 +686,14 @@ function exportPng() {
   const G = LAB.grid;
   if (G) { const g = LAB.ui.g, vals = Array.from(G.z).filter((v, i) => G.mask[i]), [lo, hi] = range(vals, g.pal === "anom"); const lev = []; for (let v = Math.ceil(lo / g.ci) * g.ci; v <= hi; v += g.ci) lev.push(v); drawMap(c2, { grid: G, lo, hi, pal: g.pal, contours: g.ct ? lev : null, hill: g.hill, pts: okSt().map(s => ({ lat: s.lat, lon: s.lon, color: "rgba(20,20,20,.55)", r: 1.3, stroke: false })) }); }
   else drawMap(c2, { pts: okSt().map(s => ({ lat: s.lat, lon: s.lon, color: instColor(s.inst), r: 2.6 })) });
+  { const cx = c2.getContext("2d"), dpr = Math.min(2, window.devicePixelRatio || 1); cx.save(); cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.font = "600 12px " + css("--disp"); cx.fillStyle = css("--muted"); cx.textAlign = "right"; cx.textBaseline = "bottom"; cx.fillText("Wadi Ghadir Gravity Lab · written by " + AUTHOR, c2.width / dpr - 12, c2.height / dpr - 2); cx.restore(); }
   const url = c2.toDataURL("image/png");
   const img = $("xImg"); img.src = url; img.hidden = false;
   c2.toBlob(blob => { holder.remove(); if (blob) saveFile("wadi_ghadir_map.png", blob, "image/png"); }, "image/png");
 }
 
 /* ================================================================ hero animation */
-const HERO = { t0: performance.now(), vis: true };
+
 function heroBg(dpr) { const bg = $("heroBg"), r = bg.getBoundingClientRect(); bg.width = r.width * dpr; bg.height = r.height * dpr; const c = bg.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, r.width, r.height); const cx = r.width * 0.8, cy = r.height * 1.05; c.lineWidth = 1; for (let i = 1; i < 30; i++) { c.strokeStyle = "rgba(232,144,95," + (0.13 - i * 0.003) + ")"; c.beginPath(); c.arc(cx, cy, i * i * 2.2 + i * 14, 0, 6.283); c.stroke(); } }
 function heroSize() { const cv = $("heroCv"); if (!cv) return; const W = cv.clientWidth || 600, E = mapExtent(), k = Math.cos((E.lat0 + E.lat1) / 2 * Math.PI / 180), H = Math.round(W * (E.lat1 - E.lat0) / ((E.lon1 - E.lon0) * k)), dpr = Math.min(2, window.devicePixelRatio || 1); cv.style.height = H + "px"; cv.width = W * dpr; cv.height = H * dpr; Object.assign(HERO, { W, H, dpr }); heroBg(dpr); }
 function heroInit() { heroSize(); if ("IntersectionObserver" in window) new IntersectionObserver(es => { HERO.vis = es[0].isIntersecting; }).observe($("heroCv")); document.addEventListener("visibilitychange", () => { HERO.vis = !document.hidden; }); requestAnimationFrame(heroFrame); }
@@ -701,6 +733,7 @@ compute(); updateBadge();
 const app = makeApp({ chapters: CH, store: "wadi-ghadir-lab", heroInit, heroSize,
   sections: [["start", "The survey", "globe"], ["data", "Data", "layers"], ["corr", "Corrections", "clock"], ["red", "Reduction", "mountain"], ["maps", "Maps", "map"], ["out", "Results", "check"]] });
 themeToggle();
+document.getElementById("heroSave").addEventListener("click", () => saveFile("Wadi_Ghadir_Gravity_Lab.html", PAGE_HTML, "text/html"));
 document.getElementById("heroOwn").addEventListener("click", () => setTimeout(() => { const f = $("fDat"); if (f) f.focus(); }, 600));
 app.init();
 })();

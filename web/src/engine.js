@@ -1,7 +1,7 @@
 /* ===== WG engine: the Wadi Ghadir gravity processing chain in the browser (no DOM) =====
    A JavaScript port of the wghadir Python chain (steps: parse, tide, QC, occupations, positions,
    base control and drift, instrument scale, reductions, Nettleton) plus gridding and contouring.
-   Author: Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics). */
+   Written by Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics), Hannover. */
 const ENG = (function () {
 "use strict";
 const D2R = Math.PI / 180, R_EARTH = 6371008.8, BOUGUER_K = 0.04193;
@@ -105,6 +105,42 @@ function parseCSV(text) {
   const head = lines[0].split(d).map(s => s.trim().replace(/^"|"$/g, ""));
   return lines.slice(1).map(l => { const f = l.split(d), o = {}; head.forEach((k, i) => { const v = (f[i] ?? "").trim().replace(/^"|"$/g, ""); o[k] = v !== "" && isF(+v) ? +v : v; }); return o; });
 }
+/* generic readings table (any gravimeter): one row per reading.
+   required: date (YYYY-MM-DD, YYYY/MM/DD or DD.MM.YYYY), time (HH:MM[:SS], UTC), station, gravity (mGal; also called
+   reading, g or corrgrav);  optional: line, instrument, stddev, tilt_x, tilt_y, tidecorr (tide already applied, mGal),
+   lat, lon (reading position).  Also accepts one "datetime" column instead of date and time. */
+function parseReadingsCSV(text, name) {
+  const rows0 = parseCSV(text);
+  if (!rows0.length) throw new Error(`${name}: the file is empty.`);
+  const keys = Object.keys(rows0[0]), find = names => keys.find(k => names.includes(k.toLowerCase().replace(/[\s_\-\[\]()]/g, "")));
+  const cDate = find(["date"]), cTime = find(["time", "timeutc", "utc"]), cDT = find(["datetime", "timestamp", "datetimeutc"]);
+  const cSt = find(["station", "stn", "point", "stationid"]), cLine = find(["line", "profile"]), cG = find(["gravity", "reading", "g", "corrgrav", "gobs", "value", "mgal"]);
+  const cInst = find(["instrument", "inst", "meter", "gravimeter"]), cSd = find(["stddev", "sd", "std", "sigma"]), cTx = find(["tiltx"]), cTy = find(["tilty"]);
+  const cTide = find(["tidecorr", "tide", "tidecorrection"]), cLat = find(["lat", "latitude", "latgps"]), cLon = find(["lon", "long", "longitude", "longps"]);
+  const miss = []; if (!cSt) miss.push("station"); if (!cG) miss.push("gravity"); if (!cDT && (!cDate || !cTime)) miss.push("date and time");
+  if (miss.length) throw new Error(`${name}: missing column(s) ${miss.join(", ")}. Found: ${keys.join(", ")}.`);
+  const isoDate = d => { d = String(d).trim(); let m;
+    if ((m = d.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    if ((m = d.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/))) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return null; };
+  const inst0 = name.replace(/\.[^.]+$/, "");
+  const rows = rows0.map((o, i) => {
+    let date, time;
+    if (cDT) { const v = String(o[cDT]).trim().replace("T", " "); date = isoDate(v.split(" ")[0]); time = v.split(" ")[1] || "00:00:00"; }
+    else { date = isoDate(o[cDate]); time = String(o[cTime]).trim(); }
+    if (!date) throw new Error(`${name}, row ${i + 2}: cannot read the date "${cDT ? o[cDT] : o[cDate]}" (use YYYY-MM-DD).`);
+    const [hh, mm, ss] = time.split(":").map(Number), [Y, M, D] = date.split("-").map(Number);
+    const g = +o[cG], sd = cSd ? +o[cSd] : 0.01, tide = cTide ? +o[cTide] : 0, lat = cLat ? +o[cLat] : NaN, lon = cLon ? +o[cLon] : NaN;
+    return { inst: cInst ? String(o[cInst]) : inst0, file: name, fileRow: i + 1, overflow: [], Date: date, Time: time,
+      Station: String(o[cSt]), Line: cLine ? String(o[cLine]) : "", t: Date.UTC(Y, M - 1, D, hh || 0, mm || 0, ss || 0),
+      CorrGrav: g, RawGrav: g, StdDev: isF(sd) ? sd : 0.01, StdErr: (isF(sd) ? sd : 0.01) / Math.sqrt(60), X: cTx ? +o[cTx] : 0, Y: cTy ? +o[cTy] : 0,
+      TideCorr: isF(tide) ? tide : 0, TiltCorr: 0, TempCorr: 0, DriftCorr: 0, LatGPS: lat, LonGPS: lon, ElevGPS: NaN, LatUser: lat, LonUser: lon };
+  }).filter(r => isF(r.CorrGrav) && isF(r.t));
+  const insts = [...new Set(rows.map(r => r.inst))];
+  return { name, inst: insts.join(", "), serial: "", header: { format: "readings table" }, cols: keys, rows };
+}
+function parseAny(f) { return /^\/\s*CG-6|^\/Station\t/m.test(f.text) ? parseCG6(f.text, f.name) : parseReadingsCSV(f.text, f.name); }
+
 /* station coordinate table: columns line, station, lat, lon, H (or h and N); optional instrument, date, u_topo, tc */
 function normaliseStations(rows) {
   const pick = (o, names) => { for (const n of names) for (const k in o) if (k.toLowerCase() === n) return o[k]; return undefined; };
@@ -183,8 +219,8 @@ function buildOccupations(rows, P) {
   const occ = [];
   for (const [id, g] of groups) {
     const a = g.filter(r => r.accepted), n = a.length, r0 = g[0];
-    const role = r0.Line === P.base.line && r0.Station === P.base.station ? "base"
-      : P.hotel.use && r0.Line === P.hotel.line && r0.Station === P.hotel.station ? "hotel" : "field";
+    const at = (b) => r0.Station === b.station && (r0.Line === b.line || r0.Line === "" || b.line === "");   // no line: station number only
+    const role = at(P.base) ? "base" : P.hotel.use && at(P.hotel) ? "hotel" : "field";
     let gm = NaN, sigma = NaN, tmid = mean(g.map(r => r.t));
     if (n) {
       const vals = a.map(r => r.g); gm = mean(vals);
@@ -455,14 +491,21 @@ function contours(g, levels) {
 /* ---------- the whole chain ---------- */
 function run(input, Praw, longman) {
   const P = mergeParams(Praw), t0 = Date.now(), log = [];
-  const files = input.files.map(f => parseCG6(f.text, f.name));
+  const files = input.files.map(parseAny);
   const rows = files.flatMap(f => f.rows);
+  if (!rows.length) throw new Error("No readings found in the files.");
   log.push(`${rows.length} readings from ${files.length} file(s)`);
+  const lookup = input.stations && input.stations.length ? stationIndex(input.stations) : null;
+  // readings without their own position take the tide position from the station table (or the survey centre)
+  if (rows.some(r => !isF(r.LatGPS))) {
+    const st = input.stations || [], cLat = median(st.map(s => s.lat)), cLon = median(st.map(s => s.lon));
+    for (const r of rows) if (!isF(r.LatGPS)) { const s = lookup && lookup(r.inst, r.Date, r.Line, r.Station); r.LatGPS = s ? s.lat : cLat; r.LonGPS = s ? s.lon : cLon; r.tidePosFrom = s ? "table" : "centre"; }
+    if (rows.some(r => !isF(r.LatGPS))) throw new Error("The readings have no positions and there is no station table: the Earth tide cannot be computed. Add lat and lon columns or a station table.");
+  }
   applyTide(rows, P, longman);
   assignOccupations(rows, P);
   rowQC(rows, P);
   const occ = buildOccupations(rows, P);
-  const lookup = input.stations && input.stations.length ? stationIndex(input.stations) : null;
   attachPositions(occ, lookup, P);
   const ref = { base: input.ref && input.ref.base ? Object.assign({}, input.ref.base) : null, hotel: input.ref && input.ref.hotel ? input.ref.hotel : null };
   if (!ref.base) { // base reference from the station table or the CG-6 GPS
@@ -477,7 +520,7 @@ function run(input, Praw, longman) {
   return { P, files, rows, occ, st, ref, base, scale, profiles, log };
 }
 
-const API = { DEFAULTS, mergeParams, parseCG6, parseCSV, normaliseStations, stationIndex, run, SB, CB, nettleton, gridStations, crossValidate, contours,
+const API = { DEFAULTS, mergeParams, parseCG6, parseReadingsCSV, parseAny, parseCSV, normaliseStations, stationIndex, run, SB, CB, nettleton, gridStations, crossValidate, contours,
   makeLocal, haversine, normalGravity, freeAir, median, mean, std };
 if (typeof module !== "undefined") module.exports = API;
 return API;

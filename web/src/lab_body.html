@@ -1,6 +1,6 @@
 <title>Wadi Ghadir Gravity Lab</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="author" content="Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics), Hannover, Germany">
+<meta name="author" content="Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics), Hannover, Germany">
 <meta name="description" content="Interactive processing of the Wadi Ghadir CG-6 gravity survey in the browser: from raw readings to Bouguer maps, with your own data and parameters.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,9 +17,10 @@
       <h1 id="heroTitle"><span>Wadi Ghadir</span><span class="hl">Gravity</span><span>Lab</span></h1>
       <p class="lede">Process the Wadi Ghadir survey in your browser, from the raw CG-6 readings to complete Bouguer maps. Change any parameter and watch every step update, or load your own CG-6 files and station table and run the same chain on them.</p>
       <div class="byline"><span class="mono" aria-hidden="true">MS</span>
-        <p><span class="who">Prepared by</span><br><span class="name">Dr. Mohamed Sobh</span><br><span class="inst">LIAG Institute for Applied Geophysics, Hannover, Germany</span></p></div>
+        <p><span class="who">Written by</span><br><span class="name">Mohamed Sobh, LIAG</span><br><span class="inst">LIAG Institute for Applied Geophysics, Hannover, Germany</span></p></div>
       <div class="hstats" id="heroStats"><div class="hstat"><b>1 519</b><span>CG-6 readings</span></div><div class="hstat"><b>985</b><span>field stations</span></div><div class="hstat"><b>9</b><span>survey days, Jan 2026</span></div></div>
-      <div class="hcta"><button class="hbtn go" type="button" data-start="2.1">Start with the data</button><button class="hbtn" type="button" data-start="5.1">Open the maps</button><button class="hbtn" type="button" data-start="2.1" id="heroOwn">Use my own data</button></div>
+      <div class="hcta"><button class="hbtn go" type="button" data-start="2.1">Start with the data</button><button class="hbtn" type="button" data-start="5.1">Open the maps</button><button class="hbtn" type="button" data-start="2.1" id="heroOwn">Use my own data</button><button class="hbtn" type="button" id="heroSave">Save this lab (HTML)</button></div>
+      <p class="hint" id="heroMsg" aria-live="polite" style="color:#9FB2BF"></p>
     </div>
     <figure class="hero-fig">
       <div class="hero-frame"><canvas id="heroCv" aria-label="Animated map: the Wadi Ghadir gravity stations appear day by day, coloured by their complete Bouguer anomaly"></canvas></div>
@@ -28,7 +29,7 @@
   </div>
 </section>
 <header class="appbar">
-  <div class="brand"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#E8905F" stroke-width="1.8"/><path d="M12 5v11M8 12l4 4 4-4" fill="none" stroke="#E8905F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Wadi Ghadir Gravity Lab <small id="dataBadge">Wadi Ghadir example data</small></span></div>
+  <div class="brand"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#E8905F" stroke-width="1.8"/><path d="M12 5v11M8 12l4 4 4-4" fill="none" stroke="#E8905F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Wadi Ghadir Gravity Lab <small>by Mohamed Sobh, LIAG</small> <small id="dataBadge">· Wadi Ghadir example data</small></span></div>
   <button class="abtn" type="button" id="themeBtn" aria-label="Switch between light and dark">Theme</button>
   <div class="prog" aria-hidden="true"><span id="progBar"></span></div>
 </header>
@@ -41,7 +42,7 @@
     <div class="nav" id="navBtns"></div>
   </main>
 </div>
-<footer class="foot"><div class="foot-in"><span><b>Wadi Ghadir Gravity Lab</b> · prepared by <b>Dr. Mohamed Sobh</b>, LIAG Institute for Applied Geophysics, Hannover, Germany</span><span>Processing chain ported from the <i>wghadir</i> Python package. Formulas: WGS84 Somigliana, Hinze et al. (2005), Longman (1959), Nettleton (1939), Sandwell (1987). Relief: Copernicus DEM GLO-30 © DLR/Airbus, ESA.</span></div></footer>
+<footer class="foot"><div class="foot-in"><span><b>Wadi Ghadir Gravity Lab</b> · written by <b>Mohamed Sobh, LIAG</b> (Leibniz Institute for Applied Geophysics, Hannover, Germany)</span><span>Processing chain ported from the <i>wghadir</i> Python package. Formulas: WGS84 Somigliana, Hinze et al. (2005), Longman (1959), Nettleton (1939), Sandwell (1987). Relief: Copernicus DEM GLO-30 © DLR/Airbus, ESA.</span></div></footer>
 <script>
 /*@@JS@@*/
 </script>

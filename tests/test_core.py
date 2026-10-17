@@ -5,6 +5,7 @@ Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
 import os
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from wghadir.gravity import cg6, gnss, reduce, settings
@@ -121,3 +122,33 @@ d.sort((a,b)=>a-b); console.log(JSON.stringify({{n:d.length, median:d[d.length>>
     out = json.loads(subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout)
     assert out["n"] > 900
     assert out["median"] < 1e-3 and out["p99"] < 0.01      # mGal
+
+
+def test_web_lab_accepts_uploaded_readings_table():
+    """A generic readings table plus station table (web/examples) reproduces the Python values for CG6-0640."""
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    ex = os.path.join(os.path.dirname(__file__), "..", "web", "examples")
+    if node is None or not os.path.exists(os.path.join(ex, "example_readings_CG6-0640.csv")):
+        pytest.skip("needs Node.js and web/examples (python scripts/build_gravity_lab.py)")
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    js = f"""
+const fs=require('fs'); eval(fs.readFileSync({json.dumps(os.path.join(root, 'web', 'src', 'gl_core.js'))},'utf8').replace('const GL=','global.GL='));
+const E=require({json.dumps(os.path.join(root, 'web', 'src', 'engine.js'))});
+const ex={json.dumps(os.path.abspath(ex))};
+const files=[{{name:'example_readings_CG6-0640.csv', text:fs.readFileSync(ex+'/example_readings_CG6-0640.csv','utf8')}}];
+const st=E.normaliseStations(E.parseCSV(fs.readFileSync(ex+'/example_stations_CG6-0640.csv','utf8')));
+const R=E.run({{files, stations:st, ref:null}}, {{}}, GL.longman);
+const ok=R.st.filter(s=>s.ok);
+console.log(JSON.stringify(Object.fromEntries(ok.map(s=>[s.key, E.CB(s,2.67)]))));
+"""
+    cb = json.loads(subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout)
+    py = pd.read_csv(os.path.join(root, "outputs", "tables", "16_field_stations_relative.csv"))
+    py = py[py["product_ok"] & (py["instrument"] == "CG6-0640")].drop_duplicates("occ_key").set_index("occ_key")
+    common = [k for k in cb if k in py.index]
+    assert len(common) > 500
+    d = np.abs(np.array([cb[k] for k in common]) - py.loc[common, "dCB_rel_rho2.67_mgal"].values)
+    assert np.max(d) < 0.002          # mGal

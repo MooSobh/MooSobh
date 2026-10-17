@@ -101,6 +101,32 @@ def build(raw, tables, external):
     }
 
 
+def write_examples(data, raw, out_dir):
+    """Upload examples: the CG-6 #0640 readings as a generic readings table, and its station table."""
+    from wghadir.gravity import cg6
+    os.makedirs(out_dir, exist_ok=True)
+    _, d = cg6.read_cg6(os.path.join(raw, INSTRUMENT_FILES["CG6-0640"]), "CG6-0640")
+    d = d[d["CorrGrav"].notna()]
+    t = pd.DataFrame({"instrument": "CG6-0640", "date": d["Date"], "time": d["Time"], "line": d["Line"], "station": d["Station"],
+                      "gravity": (d["CorrGrav"] - d["TideCorr"]).round(4), "stddev": d["StdDev"], "tilt_x": d["X"],
+                      "tilt_y": d["Y"], "lat": d["LatGPS"], "lon": d["LonGPS"]})
+    with open(os.path.join(out_dir, "example_readings_CG6-0640.csv"), "w") as fh:
+        fh.write("# Wadi Ghadir CG-6 #0640 readings, on-board tide removed (gravity = CorrGrav - TideCorr), times UTC.\n"
+                 "# Upload example for the Wadi Ghadir Gravity Lab, written by Mohamed Sobh, LIAG.\n")
+        t.to_csv(fh, index=False)
+    st = pd.DataFrame(data["stations"], columns=data["stationCols"])
+    st = st[st["inst"] == "CG6-0640"].drop_duplicates(["line", "station"])[["line", "station", "lat", "lon", "H", "u"]]
+    st = st.rename(columns={"u": "u_topo"})
+    # the base station row carries the adopted base coordinates (median of the daily GNSS solutions)
+    b = data["ref"]["base"]
+    m = (st["line"] == "0") & (st["station"] == "100")
+    st.loc[m, ["lat", "lon", "H", "u_topo"]] = [round(b["lat"], 7), round(b["lon"], 7), round(b["H"], 3), 0.0]
+    with open(os.path.join(out_dir, "example_stations_CG6-0640.csv"), "w") as fh:
+        fh.write("# Wadi Ghadir stations of CG-6 #0640: GNSS position, EGM2008 orthometric height H [m] and terrain effect\n"
+                 "# u_topo [mGal per g/cm3, relative to base 100]. Upload example, written by Mohamed Sobh, LIAG.\n")
+        st.to_csv(fh, index=False)
+
+
 def assemble(data):
     read = lambda f: open(os.path.join(SRC, f), encoding="utf-8").read()  # noqa: E731
     body = read("lab_body.html")
@@ -119,10 +145,13 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "web", "Wadi_Ghadir_Gravity_Lab.html"))
     ap.add_argument("--artifact", help="also write a body-only copy for publishing as a claude.ai artifact")
     ap.add_argument("--data-json", help="also write the embedded data bundle as JSON (for testing)")
+    ap.add_argument("--examples", default=os.path.join(ROOT, "web", "examples"),
+                    help="folder for the upload examples (readings table and station table)")
     a = ap.parse_args()
     data = build(a.raw, a.tables, a.external)
     if a.data_json:
         json.dump(data, open(a.data_json, "w"))
+    write_examples(data, a.raw, a.examples)
     page = assemble(data)
     doc = ('<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
