@@ -30,4 +30,5 @@ CROSSOVER_M = 5.0
 GRID_SPACING_M = 50.0
 BLOCK_M = 100.0
 MASK_KM = 2.0
+SPLINE_DAMPING = 1e-6     # damping of the biharmonic spline
 TAPER_KM = 3.0

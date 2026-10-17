@@ -5,15 +5,12 @@ Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import os
 
-import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap, Normalize  # noqa: E402
-
-from ..common import mapping as maps  # noqa: E402  (shared style, basemap and helpers)
-from .figures import apply_qc_style  # noqa: E402
+from ..common import mapping as maps  # shared style, basemap and helpers
+from .figures import apply_qc_style
 
 RHO_LINES = np.round(np.arange(2.0, 3.01, 0.1), 2)
 DENS_CMAP = LinearSegmentedColormap.from_list("dens", ["#9ec5f4", "#3987e5", "#1c5cab", "#4a3aa7", "#2b1b6b"])

@@ -5,16 +5,13 @@ Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
 import os
 
-import matplotlib
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
 
-matplotlib.use("Agg")
-import matplotlib.dates as mdates  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
-
-from ..common.mapping import MAP_STYLE  # noqa: E402
+from ..common.mapping import MAP_STYLE
 
 # reference categorical palette (fixed order) and status colour
 C = {"CG6-0640": "#2a78d6", "CG6-0313": "#eb6834", "third": "#1baf7a", "violet": "#4a3aa7",

@@ -16,7 +16,7 @@ from . import gnss
 from .settings import BASE_LOC_MAX_M, TARE_MGAL, TIE_MAX_HOURS
 
 
-def base_control(occ, ref):
+def base_control(occ, ref, tie_max_hours=TIE_MAX_HOURS, tare_mgal=TARE_MGAL):
     """Daily drift model per instrument from station-100 occupations.
 
     g100(t) is the piecewise-linear interpolation between successive valid
@@ -49,7 +49,7 @@ def base_control(occ, ref):
             o0, o100 = o0.iloc[0], o100.iloc[0]
             if when == "morning" and len(c0_all) and o0["t_mid"] > o100["t_mid"]:
                 continue
-            ok = bool(is0.loc[o0.name]) and abs((o100["t_mid"] - o0["t_mid"]) / pd.Timedelta(hours=1)) <= TIE_MAX_HOURS
+            ok = bool(is0.loc[o0.name]) and abs((o100["t_mid"] - o0["t_mid"]) / pd.Timedelta(hours=1)) <= tie_max_hours
             dt_h = (o100["t_mid"] - o0["t_mid"]) / pd.Timedelta(hours=1)
             raw = o100["g_occ"] - o0["g_occ"]
             ties.append(dict(instrument=inst, date=date, leg=when, t_hotel=o0["t_mid"], t_base100=o100["t_mid"],
@@ -96,7 +96,7 @@ def base_control(occ, ref):
     rate_sigma = {}
     for inst in occ["instrument"].unique():
         l = loo[loo["instrument"] == inst]["misclosure_mgal"] if len(loo) else pd.Series(dtype=float)
-        l = l[l.abs() <= TARE_MGAL]  # steps larger than this are reported as tares
+        l = l[l.abs() <= tare_mgal]  # steps larger than this are reported as tares
         model_sigma[inst] = float(np.sqrt(np.mean(l ** 2))) if len(l) else 0.02
         s = seg_rates[(seg_rates["instrument"] == inst) & (seg_rates["dt_hours"] > 1.0)]["rate_mgal_per_h"]
         rate_sigma[inst] = float(s.std(ddof=1)) if len(s) > 2 else 0.01

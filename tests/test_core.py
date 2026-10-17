@@ -69,3 +69,12 @@ def test_terrain_flat_dem_matches_slab():
     g1 = model.unit_effect(lon0, lat0, h)[0]
     assert model.coverage_ok(lon0, lat0)
     assert g1 / (0.04193 * h) == pytest.approx(1.0, abs=0.01)
+
+
+def test_magnetic_despike_reproduces_delivered_count():
+    """Default Hampel parameters reject the 155 spikes of the delivered magnetic product."""
+    from wghadir.magnetic import processing
+
+    d = processing.despike(processing.load(os.path.join(RAW, "magnetics", "All_Data_Corrected_Total_Intensity.xlsx")))
+    assert int(d["flags"].str.contains("SPIKE").sum()) == 155
+    assert int(d["accepted"].sum()) == 12006

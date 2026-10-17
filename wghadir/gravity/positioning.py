@@ -91,7 +91,7 @@ def load_gnss(raw_dir):
     return P, K, master_check, pd.DataFrame(zip_list, columns=["zip_member", "bytes"])
 
 
-def gnss_datum_check(P):
+def gnss_datum_check(P, shift_min_m=DAY_DATUM_SHIFT_MIN_M):
     """Per-day height of the two base marks relative to their multi-day median."""
     rows = []
     ref = {}
@@ -113,10 +113,10 @@ def gnss_datum_check(P):
         shift = 0.0
         sig = 0.0
         rule = "no adjustment"
-        if both and np.sign(o["hotel_0"]) == np.sign(o["base_100"]) and min(abs(o["hotel_0"]), abs(o["base_100"])) > DAY_DATUM_SHIFT_MIN_M:
+        if both and np.sign(o["hotel_0"]) == np.sign(o["base_100"]) and min(abs(o["hotel_0"]), abs(o["base_100"])) > shift_min_m:
             shift = float((o["hotel_0"] + o["base_100"]) / 2)
             sig = float(abs(o["hotel_0"] - o["base_100"]) / 2)
-            rule = "both base marks offset > %.1f m with equal sign: heights reduced by mean offset" % DAY_DATUM_SHIFT_MIN_M
+            rule = "both base marks offset > %.1f m with equal sign: heights reduced by mean offset" % shift_min_m
         m = mrsa[mrsa["gnss_day"] == k]
         days.append(dict(gnss_day=k, dh_hotel0_m=o.get("hotel_0", np.nan), dh_base100_m=o.get("base_100", np.nan),
                          day_height_shift_m=shift, day_shift_sigma_m=sig, rule=rule,
@@ -158,7 +158,8 @@ def _id_ok(c, exp):
     return (c["point_id"] in exp) or (str(c["point_id_kml"]) in exp)
 
 
-def match_occupations(occ, P, day_of_date, datum_days, ref):
+def match_occupations(occ, P, day_of_date, datum_days, ref, max_dist_m=MATCH_MAX_M, ambig_margin_m=AMBIG_MARGIN_M,
+                      distinct_loc_m=DISTINCT_LOC_M):
     """Step 6: match every occupation to one GNSS point of its day (distance, ambiguity and station-ID rules) and attach position, height and height sigma."""
     shifts = datum_days.set_index("gnss_day")
     cand_all = P[P["source_type"].isin(["workbook", "kml_only"])].copy()
@@ -180,7 +181,7 @@ def match_occupations(occ, P, day_of_date, datum_days, ref):
         d1 = d[order[0]]
         # points within DISTINCT_LOC_M of the nearest are one location: prefer the
         # label that agrees with the instrument record (does not change coordinates)
-        same_loc = [j for j in order if gnss.haversine_m(c1["lat"], c1["lon"], C["lat"].iloc[j], C["lon"].iloc[j]) <= DISTINCT_LOC_M]
+        same_loc = [j for j in order if gnss.haversine_m(c1["lat"], c1["lon"], C["lat"].iloc[j], C["lon"].iloc[j]) <= distinct_loc_m]
         for j in same_loc:
             if _id_ok(C.iloc[j], exp):
                 c1, d1 = C.iloc[j], d[j]
@@ -188,19 +189,19 @@ def match_occupations(occ, P, day_of_date, datum_days, ref):
         # second candidate at a distinct location
         d2, c2 = np.nan, None
         for j in order:
-            if gnss.haversine_m(c1["lat"], c1["lon"], C["lat"].iloc[j], C["lon"].iloc[j]) > DISTINCT_LOC_M:
+            if gnss.haversine_m(c1["lat"], c1["lon"], C["lat"].iloc[j], C["lon"].iloc[j]) > distinct_loc_m:
                 d2, c2 = d[j], C.iloc[j]
                 break
         id_ok = _id_ok(c1, exp)
         status = "MATCHED"
-        if d1 > MATCH_MAX_M:
-            status = "UNMATCHED_GT_%dM" % MATCH_MAX_M
-        elif c2 is not None and d2 < d1 + AMBIG_MARGIN_M:
+        if d1 > max_dist_m:
+            status = "UNMATCHED_GT_%dM" % max_dist_m
+        elif c2 is not None and d2 < d1 + ambig_margin_m:
             # distance alone cannot decide; use the label only if exactly one candidate agrees
             ok2 = _id_ok(c2, exp)
             if id_ok and not ok2:
                 status = "MATCHED_ID_TIEBREAK"
-            elif ok2 and not id_ok and d2 <= MATCH_MAX_M:
+            elif ok2 and not id_ok and d2 <= max_dist_m:
                 c1, c2, d1, d2 = c2, c1, d2, d1
                 id_ok = True
                 status = "MATCHED_ID_TIEBREAK"

@@ -16,6 +16,9 @@ import json
 import os
 import sys
 
+import matplotlib
+
+matplotlib.use("Agg")  # files only, no screen output
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from wghadir.chains import GravityChain  # noqa: E402
 

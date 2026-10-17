@@ -25,7 +25,7 @@ import pandas as pd
 
 from ..common.mapping import EXTENT
 from .settings import (BLOCK_M, CROSSOVER_M, GRID_SPACING_M, HAMPEL_FLOOR_NT, HAMPEL_K,  # noqa: F401
-                       HAMPEL_WINDOW, MASK_KM, SURVEY_DATE, TAPER_KM)
+                       HAMPEL_WINDOW, MASK_KM, SPLINE_DAMPING, SURVEY_DATE, TAPER_KM)
 
 
 # -----------------------------------------------------------------------------
@@ -69,16 +69,16 @@ def load(path):
     return d
 
 
-def despike(d):
+def despike(d, window=HAMPEL_WINDOW, k=HAMPEL_K, floor_nt=HAMPEL_FLOOR_NT):
     """Hampel filter on the corrected total field, applied within each day."""
     d = d.copy()
     d["hampel_median_nT"] = np.nan
     d["hampel_dev_nT"] = np.nan
-    for k, g in d[d["day_seq"] > 0].groupby("day_seq"):
+    for _, g in d[d["day_seq"] > 0].groupby("day_seq"):
         s = g["tmi_corr_nT"]
-        med = s.rolling(HAMPEL_WINDOW, center=True, min_periods=3).median()
-        mad = (s - med).abs().rolling(HAMPEL_WINDOW, center=True, min_periods=3).median()
-        thr = np.maximum(HAMPEL_FLOOR_NT, HAMPEL_K * 1.4826 * mad)
+        med = s.rolling(window, center=True, min_periods=3).median()
+        mad = (s - med).abs().rolling(window, center=True, min_periods=3).median()
+        thr = np.maximum(floor_nt, k * 1.4826 * mad)
         dev = (s - med).abs()
         d.loc[g.index, "hampel_median_nT"] = med
         d.loc[g.index, "hampel_dev_nT"] = dev
@@ -152,11 +152,11 @@ def day_summary(d):
 
 # -----------------------------------------------------------------------------
 # Gridding and reduction to the pole
-def _chain():
+def _chain(block_m=BLOCK_M, damping=SPLINE_DAMPING):
     import verde as vd
-    return vd.Chain([("block", vd.BlockReduce(np.median, spacing=BLOCK_M)),
+    return vd.Chain([("block", vd.BlockReduce(np.median, spacing=block_m)),
                      ("trend", vd.Trend(degree=1)),
-                     ("spline", vd.Spline(damping=1e-6, mindist=25.0))])
+                     ("spline", vd.Spline(damping=damping, mindist=25.0))])
 
 
 def _region(extent, pad_m=0.0):
@@ -174,6 +174,11 @@ def _lonlat(g):
     return inv.transform(E, N)
 
 
+def grid_lonlat(g):
+    """Longitude and latitude arrays of every node of a UTM 36N grid."""
+    return _lonlat(g)
+
+
 def _dist_to_data(g, x, y):
     from scipy.spatial import cKDTree
     E, N = np.meshgrid(g.easting.values, g.northing.values)
@@ -181,35 +186,37 @@ def _dist_to_data(g, x, y):
     return dist.reshape(E.shape)
 
 
-def grid_field(x, y, v, extent=EXTENT):
-    """Step 5: grid a field (block median, trend, spline) on GRID_SPACING_M, blanked > MASK_KM from data."""
-    chain = _chain().fit((x, y), v)
-    g = chain.grid(region=_region(extent), spacing=GRID_SPACING_M, data_names="value", dims=("northing", "easting"))
+def grid_field(x, y, v, extent=EXTENT, spacing=GRID_SPACING_M, block_m=BLOCK_M, mask_km=MASK_KM,
+               damping=SPLINE_DAMPING):
+    """Step 5: grid a field (block median, trend, spline) on a `spacing` grid, blanked > mask_km from data."""
+    chain = _chain(block_m, damping).fit((x, y), v)
+    g = chain.grid(region=_region(extent), spacing=spacing, data_names="value", dims=("northing", "easting"))
     dist = _dist_to_data(g, x, y)
-    g["value"] = g["value"].where(dist <= MASK_KM * 1000)
+    g["value"] = g["value"].where(dist <= mask_km * 1000)
     return g
 
 
-def cv_rmse(x, y, v):
+def cv_rmse(x, y, v, block_m=BLOCK_M, damping=SPLINE_DAMPING):
     """Block K-fold cross-validation rms error of the gridding chain."""
     import verde as vd
-    bx, bv = vd.BlockReduce(np.median, spacing=BLOCK_M).filter((x, y), v)
+    bx, bv = vd.BlockReduce(np.median, spacing=block_m).filter((x, y), v)
     cv = vd.BlockKFold(spacing=2000, n_splits=5, shuffle=True, random_state=0)
-    return float(-np.mean(vd.cross_val_score(_chain(), bx, bv, cv=cv, scoring="neg_root_mean_squared_error")))
+    return float(-np.mean(vd.cross_val_score(_chain(block_m, damping), bx, bv, cv=cv, scoring="neg_root_mean_squared_error")))
 
 
-def rtp_grid(x, y, tma, inc, dec, extent=EXTENT):
+def rtp_grid(x, y, tma, inc, dec, extent=EXTENT, spacing=GRID_SPACING_M, block_m=BLOCK_M, mask_km=MASK_KM,
+             taper_km=TAPER_KM, damping=SPLINE_DAMPING):
     """Reduction to the pole of the total-field anomaly (induced magnetisation)."""
     import harmonica as hm
     import xrft
 
-    pad_m = (MASK_KM + TAPER_KM) * 1000
-    chain = _chain().fit((x, y), tma)
-    g = chain.grid(region=_region(extent, pad_m), spacing=GRID_SPACING_M, data_names="value",
+    pad_m = (mask_km + taper_km) * 1000
+    chain = _chain(block_m, damping).fit((x, y), tma)
+    g = chain.grid(region=_region(extent, pad_m), spacing=spacing, data_names="value",
                    dims=("northing", "easting"))["value"]
     dist = _dist_to_data(g.to_dataset(), x, y)
     level = float(np.median(tma))
-    w = np.clip((MASK_KM * 1000 + TAPER_KM * 1000 - dist) / (TAPER_KM * 1000), 0, 1)
+    w = np.clip((mask_km * 1000 + taper_km * 1000 - dist) / (taper_km * 1000), 0, 1)
     w = np.sin(0.5 * np.pi * w) ** 2                         # 1 inside the data mask, 0 beyond the taper
     dev = (g - level) * w
     n_pad = int(np.ceil(0.5 * max(dev.shape)))
@@ -217,7 +224,7 @@ def rtp_grid(x, y, tma, inc, dec, extent=EXTENT):
     r = hm.reduction_to_pole(padded, inclination=inc, declination=dec)
     r = xrft.unpad(r, {"easting": n_pad, "northing": n_pad})
     r = r.assign_coords(easting=g.easting, northing=g.northing)
-    r = r.where(dist <= MASK_KM * 1000)
+    r = r.where(dist <= mask_km * 1000)
     reg = _region(extent)
     r = r.sel(easting=slice(reg[0], reg[1]), northing=slice(reg[2], reg[3]))
     return r.to_dataset(name="value")

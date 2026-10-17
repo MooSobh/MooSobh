@@ -38,8 +38,12 @@ python -m pip install -e .       # optional: makes `import wghadir` work from an
 jupyter lab notebooks/
 ```
 
-* `notebooks/01_Gravity_Processing.ipynb` runs the gravity chain, steps 1–14.
-* `notebooks/02_Magnetic_Processing.ipynb` runs the magnetic chain, steps 1–8.
+* `notebooks/01_Gravity_Processing.ipynb`: gravity, steps 1–14, from loading the CG-6 files to the maps.
+* `notebooks/02_Magnetic_Processing.ipynb`: magnetics, steps 1–8, from loading the workbook to the RTP map.
+
+Each step has a **✏️ PARAMETERS** cell (thresholds, densities, grid spacing and so on, all editable), a **▶ PROCESSING**
+cell that calls the `wghadir` functions directly, and a **📊 RESULT** cell with tables and plots made in the notebook.
+After a change, re-run that step and the steps below it. The default parameters reproduce the delivered results.
 
 **From the command line:**
 

@@ -7,16 +7,13 @@ the magnetic maps so that both share one visual language.
 Author : Dr. Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics)
 Project: Wadi Ghadir gravity and magnetic survey, Eastern Desert, Egypt (2026)
 """
-import matplotlib
+import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.ticker import FuncFormatter, MultipleLocator
 
-matplotlib.use("Agg")
-import matplotlib.patheffects as pe  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
-from matplotlib.ticker import FuncFormatter, MultipleLocator  # noqa: E402
-
-from .geodata import hillshade  # noqa: E402
+from .geodata import hillshade
 
 
 # -----------------------------------------------------------------------------
