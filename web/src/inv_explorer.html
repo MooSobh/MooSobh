@@ -1,0 +1,768 @@
+<title>Wadi Ghadir Inversion Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="author" content="Mohamed Sobh, LIAG">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: an instrument console. A sticky control strip, then a map + 3-D pair above a full-width section; tabs switch to data fit and convergence. */
+:root {
+  --bg: #eceeec; --panel: #fbfcfb; --ink: #16201e; --muted: #5a6764; --line: #d3d9d7; --soft: #e2e7e5;
+  --accent: #0f6b62; --accent-ink: #ffffff; --warn: #a2470d;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1312; --panel: #151c1b; --ink: #e2eae8; --muted: #92a19d; --line: #293432; --soft: #1d2624;
+  --accent: #4cc0ae; --accent-ink: #06201c; --warn: #f0a46a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1312; --panel: #151c1b; --ink: #e2eae8; --muted: #92a19d; --line: #293432; --soft: #1d2624;
+  --accent: #4cc0ae; --accent-ink: #06201c; --warn: #f0a46a; color-scheme: dark }
+html, body { background: var(--bg); color: var(--ink); }
+body { font: 15px/1.5 var(--body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1480px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 22px 40px; display: grid; gap: 18px; }
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 28px; }
+.eyebrow { font: 500 12px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 700 clamp(28px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.01em; margin: 6px 0 6px; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+.byline { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.byline b { color: var(--ink); font-weight: 600; }
+nav.tabs { display: flex; gap: 4px; background: var(--soft); padding: 4px; border-radius: 999px; flex-wrap: wrap; }
+nav.tabs button { font: 500 14px var(--body); border: 0; background: transparent; color: var(--ink); padding: 7px 16px; border-radius: 999px; cursor: pointer; }
+nav.tabs button[aria-selected="true"] { background: var(--panel); box-shadow: 0 1px 2px rgba(0,0,0,.12); color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.controls { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px);
+  display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ctl > .lab { font: 500 11px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { font: 500 13.5px var(--body); border: 0; background: transparent; color: var(--ink); padding: 6px 11px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button:disabled { color: var(--muted); opacity: .45; cursor: not-allowed; }
+select { font: 13.5px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 100%; }
+label.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; }
+input[type="range"] { accent-color: var(--accent); width: 150px; }
+.btn { font: 500 13.5px var(--body); border: 1px solid var(--accent); color: var(--accent); background: transparent; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px; min-width: 0; }
+.stat .k { font: 500 11px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font: 500 19px/1.3 var(--mono); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.stat .s { font-size: 12.5px; color: var(--muted); }
+
+.grid2 { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 980px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px 12px; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.phead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; }
+.phead h2 { font: 600 17px/1.2 var(--display); margin: 0; }
+.phead .sub { font: 12.5px var(--mono); color: var(--muted); }
+canvas { display: block; width: 100%; touch-action: none; }
+.cv-map, .cv-sec { cursor: crosshair; }
+.readout { font: 12.5px var(--mono); color: var(--muted); min-height: 1.5em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cbar canvas { width: min(320px, 100%); height: 34px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); }
+.maps { display: grid; gap: 10px; }
+.maps .lbl { font: 500 12.5px var(--mono); color: var(--muted); }
+#view3d { position: relative; width: 100%; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 8px; overflow: hidden; background: var(--soft); touch-action: none; cursor: grab; }
+#view3d canvas { width: 100% !important; height: 100% !important; }
+#view3d .hint { position: absolute; left: 10px; bottom: 8px; font: 11.5px var(--mono); color: var(--muted); pointer-events: none; }
+#view3d .nogl { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; color: var(--muted); }
+@media (min-width: 981px) { .p3d { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 70px); align-self: start; } }
+@media (max-width: 560px) { #view3d .hint { display: none; } }
+.row { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; }
+.note { font-size: 13.5px; color: var(--muted); max-width: 80ch; }
+.fitgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .fitgrid { grid-template-columns: minmax(0, 1fr); } }
+.chartgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .chartgrid { grid-template-columns: minmax(0, 1fr); } }
+.tblwrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13.5px; width: 100%; min-width: 640px; }
+th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+td.m { font-family: var(--mono); }
+.about { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.about h3 { font: 600 16px var(--display); margin: 0 0 4px; }
+.about p { margin: 0 0 8px; font-size: 14px; max-width: 65ch; }
+footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+[hidden] { display: none !important; }
+@media (max-width: 560px) { .controls { position: static; } input[type="range"] { width: 120px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div>
+    <div class="eyebrow">Wadi Ghadir · Eastern Desert, Egypt · SimPEG 3-D inversions</div>
+    <h1>Inversion Explorer</h1>
+    <p class="lede">Move through the compact, smooth and joint models of notebooks 06–08: slice at any elevation, cut a section along any line, turn the anomalous bodies in 3-D and check how well each model fits the gravity and magnetic data.</p>
+    <div class="byline"><b>Written by Mohamed Sobh, LIAG</b> · Leibniz Institute for Applied Geophysics, Hannover</div>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button role="tab" id="tab-model" aria-selected="true" data-tab="model">Models</button>
+    <button role="tab" id="tab-fit" aria-selected="false" data-tab="fit">Data fit</button>
+    <button role="tab" id="tab-conv" aria-selected="false" data-tab="conv">Convergence</button>
+    <button role="tab" id="tab-about" aria-selected="false" data-tab="about">Method</button>
+  </nav>
+</header>
+
+<!-- ============ MODELS ============ -->
+<section id="pane-model" role="tabpanel" aria-labelledby="tab-model" style="display:grid;gap:16px">
+  <div class="controls">
+    <div class="ctl"><span class="lab">Property</span>
+      <div class="seg" id="seg-prop">
+        <button data-v="density" aria-pressed="true">Density Δρ</button><button data-v="susceptibility" aria-pressed="false">Susceptibility χ</button><button data-v="units" aria-pressed="false">Joint units</button>
+      </div></div>
+    <div class="ctl"><span class="lab">Inversion</span>
+      <div class="seg" id="seg-run">
+        <button data-v="compact" aria-pressed="true">Compact</button><button data-v="smooth" aria-pressed="false">Smooth</button><button data-v="joint" aria-pressed="false">Joint</button>
+      </div></div>
+    <div class="ctl"><label class="lab" for="sel-cmp">Compare with</label>
+      <select id="sel-cmp"><option value="">nothing</option></select>
+      <label class="chk" id="lab-same" hidden><input type="checkbox" id="chk-same"> same colour scale</label></div>
+    <div class="ctl">
+      <label class="chk"><input type="checkbox" id="chk-far" checked> hide unconstrained</label>
+      <label class="chk"><input type="checkbox" id="chk-data" checked> data points</label>
+      <label class="chk"><input type="checkbox" id="chk-shade" checked> relief</label>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="phead"><h2 id="map-title">Horizontal slice</h2>
+        <div class="ctl"><label class="lab" for="rng-k">Elevation</label><input type="range" id="rng-k"><span class="sub" id="lab-k"></span></div></div>
+      <div class="maps" id="maps"></div>
+      <div class="readout" id="ro-map">Point at the map to read the model. Drag A or B to move the section.</div>
+      <div class="cbar" id="cbar"></div>
+    </div>
+    <div class="panel p3d">
+      <div class="phead"><h2>3-D view</h2>
+        <div class="ctl"><label class="lab" for="rng-thr">Show cells above</label><input type="range" id="rng-thr" min="5" max="95" value="30"><span class="sub" id="lab-thr"></span></div></div>
+      <div id="view3d"><span class="hint">drag: turn · shift-drag or two fingers: move · wheel or pinch: zoom</span></div>
+      <div class="row">
+        <div class="ctl"><label class="lab" for="rng-ve">Vertical ×</label><input type="range" id="rng-ve" min="1" max="4" step="0.5" value="2"><span class="sub" id="lab-ve"></span></div>
+        <label class="chk"><input type="checkbox" id="chk-terrain" checked> terrain</label>
+        <label class="chk"><input type="checkbox" id="chk-planes" checked> slice and section planes</label>
+        <button class="btn" id="btn-reset3d">Reset view</button>
+      </div>
+      <div class="readout" id="ro-3d"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><h2>Vertical section <span id="sec-name" class="sub"></span></h2>
+      <div class="ctl"><label class="lab" for="sel-sec">Line</label><select id="sel-sec"></select>
+        <button class="btn" id="btn-draw" aria-pressed="false">Draw a new line on the map</button></div></div>
+    <div class="maps" id="secs"></div>
+    <div class="readout" id="ro-sec">Click the section to move the horizontal slice to that elevation.</div>
+  </div>
+</section>
+
+<!-- ============ DATA FIT ============ -->
+<section id="pane-fit" role="tabpanel" aria-labelledby="tab-fit" hidden style="display:grid;gap:16px">
+  <div class="controls">
+    <div class="ctl"><span class="lab">Data</span>
+      <div class="seg" id="seg-fset"><button data-v="gravity" aria-pressed="true">Gravity</button><button data-v="magnetic" aria-pressed="false">Magnetics</button></div></div>
+    <div class="ctl"><span class="lab">Model</span>
+      <div class="seg" id="seg-frun"><button data-v="compact" aria-pressed="true">Compact</button><button data-v="smooth" aria-pressed="false">Smooth</button><button data-v="joint" aria-pressed="false">Joint</button></div></div>
+  </div>
+  <div class="stats" id="fit-stats"></div>
+  <div class="fitgrid" id="fit-maps"></div>
+  <div class="readout" id="ro-fit">Point at a data block to read its values.</div>
+  <div class="chartgrid">
+    <div class="panel"><div class="phead"><h2>Observed against predicted</h2></div><canvas id="cv-xplot"></canvas></div>
+    <div class="panel"><div class="phead"><h2>Normalised residuals</h2><span class="sub">(observed − predicted) / uncertainty</span></div><canvas id="cv-hist"></canvas></div>
+  </div>
+  <p class="note">Predicted data of the compact models are those of the notebooks; the smooth and joint predictions were forward-modelled with the same SimPEG simulations when this page was built. A model fits its data to their uncertainties when χ² is near 1 and the residuals spread like a standard normal curve.</p>
+</section>
+
+<!-- ============ CONVERGENCE ============ -->
+<section id="pane-conv" role="tabpanel" aria-labelledby="tab-conv" hidden style="display:grid;gap:16px">
+  <div class="panel"><div class="phead"><h2>All runs</h2><span class="sub">compactness: share of cells holding 90 % of the model</span></div>
+    <div class="tblwrap"><table id="tbl-runs"></table></div></div>
+  <div class="chartgrid">
+    <div class="panel"><div class="phead"><h2>Gravity, compact</h2><span class="sub">notebook 06</span></div><canvas id="cv-cg"></canvas></div>
+    <div class="panel"><div class="phead"><h2>Magnetics, compact</h2><span class="sub">notebook 07</span></div><canvas id="cv-cm"></canvas></div>
+    <div class="panel"><div class="phead"><h2>Joint, compact: data misfits</h2><span class="sub">notebook 08</span></div><canvas id="cv-cj"></canvas></div>
+    <div class="panel"><div class="phead"><h2>Joint, compact: cross-gradient term</h2><span class="sub">notebook 08</span></div><canvas id="cv-cx"></canvas></div>
+  </div>
+  <p class="note">Each compact run starts with smooth L2 iterations, cooling β until the data misfit φ<sub>d</sub> reaches its target (the number of data). From the dashed line on, IRLS re-weights the regularisation towards sparse norms while keeping the misfit near the target.</p>
+</section>
+
+<!-- ============ METHOD ============ -->
+<section id="pane-about" role="tabpanel" aria-labelledby="tab-about" hidden>
+  <div class="panel about">
+    <div><h3>Data</h3><p>Gravity: residual complete Bouguer anomaly (2.67 g/cm³, regional of 3 km upward continuation removed), 984 stations reduced to <span id="ab-ng"></span> block medians of 400 m. Magnetics: total-field anomaly minus IGRF-14 and a plane, <span id="ab-nm"></span> block medians. Data sit at the sensor heights above the Copernicus GLO-30 surface.</p></div>
+    <div><h3>Mesh</h3><p><span id="ab-mesh"></span> cells; 400 m × 400 m × 100 m in the core, padding growing by 1.3 to the sides and below; cells above the topography are air. The explorer shows the core and the top 3.3 km.</p></div>
+    <div><h3>Compact inversion</h3><p>Sparse norms p = 0 on the model and p = 1 on its three gradients, solved by iteratively re-weighted least squares (SimPEG <code>Sparse</code> + <code>UpdateIRLS</code>) after a smooth L2 start. Bounds: Δρ ±0.3 g/cm³, χ 0–0.3 SI. Sensitivity weighting counters the decay of the kernels with depth.</p></div>
+    <div><h3>Joint inversion</h3><p>Both data sets in one objective with a cross-gradient term (λ = 10⁹) that favours parallel gradients of Δρ and χ, so boundaries coincide without tying values together. Units: thresholds ±0.02 g/cm³ and 0.005 SI.</p></div>
+    <div><h3>Reading the models</h3><p>Potential-field data do not determine a unique model. Compact and smooth models fit the data equally well and bracket the shapes the data allow. Magnetic models assume induced magnetisation along today's field. Cells farther than 2.5 km from any data point are unconstrained and hidden by default.</p></div>
+    <div><h3>Files</h3><p>Notebooks <code>06_SimPEG_Gravity_Inversion</code>, <code>07_SimPEG_Magnetic_Inversion</code>, <code>08_SimPEG_Joint_Inversion</code>; models in <code>outputs/inversion/</code> (NumPy, UBC-GIF); this page from <code>scripts/build_inversion_explorer.py</code>.</p></div>
+  </div>
+</section>
+
+<footer>Wadi Ghadir Inversion Explorer · written by Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics, Hannover, Germany). SimPEG (Cockett et al. 2015), discretize, Choclo; cross-gradient after Gallardo &amp; Meju (2003). Relief: Copernicus DEM GLO-30 © DLR/Airbus, ESA. Coordinates: UTM zone 36N, WGS 84.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+// Wadi Ghadir Inversion Explorer, written by Mohamed Sobh, LIAG.
+const D = /*__DATA__*/null;
+const $ = (s) => document.querySelector(s);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// ---------------------------------------------------------------- data
+function bytes(b64) { const s = atob(b64), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+const M = D.mesh, nx = M.hx.length, ny = M.hy.length, nz = M.hz.length, P = M.n_pad_xy;
+const cum = (o, h) => { const e = [o]; h.forEach((d) => e.push(e[e.length - 1] + d)); return e; };
+const xe = cum(M.origin[0], M.hx), ye = cum(M.origin[1], M.hy), ze = cum(M.origin[2], M.hz);
+const xc = M.hx.map((_, i) => (xe[i] + xe[i + 1]) / 2), yc = M.hy.map((_, j) => (ye[j] + ye[j + 1]) / 2), zc = M.hz.map((_, k) => (ze[k] + ze[k + 1]) / 2);
+const X0 = xe[P], X1 = xe[nx - P], Y0 = ye[P], Y1 = ye[ny - P], ZTOP = ze[nz], ZMIN = -2500;
+let KMIN = 0; while (zc[KMIN] < ZMIN) KMIN++;
+const MODELS = {}; for (const [k, m] of Object.entries(D.models)) MODELS[k] = Object.assign({}, m, { q: bytes(m.q), key: k });
+const FAR = { gravity: bytes(D.far.gravity), magnetic: bytes(D.far.magnetic) };
+const T = D.terrain, Z200 = new Int16Array(bytes(T.z200).buffer);
+const HILL = new Image(); HILL.src = T.hillshade; HILL.onload = () => redraw();
+const cellIndex = (i, j, k) => i + nx * (j + ny * k);
+function findCell(edges, v) { if (v < edges[0] || v >= edges[edges.length - 1]) return -1; let lo = 0, hi = edges.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (edges[m] <= v) lo = m; else hi = m; } return lo; }
+function terrainZ(e, n) {
+  const fx = (e - T.x0) / 200, fy = (T.y1 - n) / 200;
+  if (fx < 0 || fy < 0 || fx > T.nx200 - 1 || fy > T.ny200 - 1) return NaN;
+  const i = Math.min(Math.floor(fx), T.nx200 - 2), j = Math.min(Math.floor(fy), T.ny200 - 2), a = fx - i, b = fy - j, z = (r, c) => Z200[r * T.nx200 + c];
+  return (1 - b) * ((1 - a) * z(j, i) + a * z(j, i + 1)) + b * ((1 - a) * z(j + 1, i) + a * z(j + 1, i + 1));
+}
+
+// ---------------------------------------------------------------- colours
+const RDBU = ["#053061", "#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#f7f7f7", "#fddbc7", "#f4a582", "#d6604d", "#b2182b", "#67001f"];
+const MAGMA_R = ["#fcfdbf", "#fec287", "#fb8761", "#e55964", "#b5367a", "#812581", "#4f127b", "#1c1044", "#000004"];
+const UCOL = ["#e8e8e8", "#7b1fa2", "#d84315", "#1e88e5", "#fdd835"];
+const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const RDBU_RGB = RDBU.map(hex), MAGMA_RGB = MAGMA_R.map(hex), UCOL_RGB = UCOL.map(hex);
+function ramp(stops, t) { t = Math.max(0, Math.min(1, t)) * (stops.length - 1); const i = Math.min(Math.floor(t), stops.length - 2), f = t - i, a = stops[i], b = stops[i + 1]; return [a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1]), a[2] + f * (b[2] - a[2])]; }
+const PROPS = {
+  density: { sym: "Δρ", unit: "g/cm³", data: "gravity", fmt: (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(3) },
+  susceptibility: { sym: "χ", unit: "SI", data: "magnetic", fmt: (v) => v.toFixed(4) },
+  units: { sym: "unit", unit: "", data: "both", fmt: (v) => D.units_names[v] },
+};
+const RUN_LABEL = { compact: "compact", smooth: "smooth", joint: "joint" };
+const KEY = { density: "rho_", susceptibility: "chi_" };
+const modelKey = (prop, run) => (prop === "units" ? "units_joint" : KEY[prop] + run);
+const modelName = (key) => { const m = MODELS[key]; return m.property === "units" ? "joint units" : `${PROPS[m.property].sym} ${RUN_LABEL[m.kind]}`; };
+const value = (m, q) => (m.property === "units" ? q : m.lo + (q / 254) * (m.hi - m.lo));
+function scaleOf(key, partner) {
+  const m = MODELS[key];
+  if (m.property === "units") return null;
+  let hi = m.property === "density" ? Math.max(Math.abs(m.lo), Math.abs(m.hi)) : m.hi;
+  if (partner && S.same && MODELS[partner].property === m.property) { const p = MODELS[partner]; hi = Math.max(hi, p.property === "density" ? Math.max(Math.abs(p.lo), Math.abs(p.hi)) : p.hi); }
+  return m.property === "density" ? { lo: -hi, hi } : { lo: 0, hi };
+}
+function colourOf(m, sc, v) {
+  if (m.property === "units") return UCOL_RGB[v] || UCOL_RGB[0];
+  const t = (v - sc.lo) / (sc.hi - sc.lo);
+  return ramp(m.property === "density" ? RDBU_RGB : MAGMA_RGB, t);
+}
+function lut(key, partner) { const m = MODELS[key], sc = scaleOf(key, partner), L = []; for (let q = 0; q < 255; q++) L.push(colourOf(m, sc, value(m, q)).map(Math.round)); return L; }
+function isFar(m, i, j) {
+  const c = j * nx + i, d = PROPS[m.property].data;
+  return d === "both" ? FAR.gravity[c] || FAR.magnetic[c] : FAR[d][c];
+}
+
+// ---------------------------------------------------------------- state
+let kStart = KMIN; for (let k = KMIN; k < nz; k++) if (Math.abs(zc[k] + 650) < Math.abs(zc[kStart] + 650)) kStart = k;
+const SECS = Object.assign({}, D.sections);
+SECS["W–E through the centre"] = [[X0 + 600, (Y0 + Y1) / 2], [X1 - 600, (Y0 + Y1) / 2]];
+SECS["S–N through the centre"] = [[(X0 + X1) / 2, Y0 + 600], [(X0 + X1) / 2, Y1 - 600]];
+const S = { prop: "density", run: "compact", cmp: "", same: false, k: kStart, hideFar: true, showData: true, shade: true,
+  sec: Object.keys(SECS)[0], A: SECS[Object.keys(SECS)[0]][0].slice(), B: SECS[Object.keys(SECS)[0]][1].slice(), drawing: false, drawStep: 0,
+  thr: 0.3, ve: 2, terrain: true, planes: true, fset: "gravity", frun: "compact" };
+try { const t = localStorage.getItem("wgie-tab"); if (t) S.tab = t; } catch (e) { /* storage unavailable */ }
+
+// ---------------------------------------------------------------- canvas helpers
+function fitCanvas(cv, cssH) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth || cv.parentElement.clientWidth;
+  cv.style.height = cssH + "px"; cv.width = Math.round(w * dpr); cv.height = Math.round(cssH * dpr);
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w, h: cssH };
+}
+function niceStep(range, n) { const r = range / n, p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }
+const fmtKm = (v) => (v / 1000).toFixed(0);
+function frame(g, x, y, w, h) { g.strokeStyle = css("--line"); g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w, h); }
+function mapAxes(g, tf) {
+  const ink = css("--muted"); g.fillStyle = ink; g.font = "11px " + css("--mono"); g.strokeStyle = ink;
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (let e = Math.ceil(X0 / 5000) * 5000; e <= X1; e += 5000) { const x = tf.x(e); g.beginPath(); g.moveTo(x, tf.y0 + tf.h); g.lineTo(x, tf.y0 + tf.h + 4); g.stroke(); g.fillText(fmtKm(e), x, tf.y0 + tf.h + 6); }
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let n = Math.ceil(Y0 / 5000) * 5000; n <= Y1; n += 5000) { const y = tf.y(n); g.beginPath(); g.moveTo(tf.x0 - 4, y); g.lineTo(tf.x0, y); g.stroke(); g.fillText(fmtKm(n), tf.x0 - 6, y); }
+  g.textAlign = "center"; g.textBaseline = "top"; g.fillText("easting [km], UTM 36N", tf.x0 + tf.w / 2, tf.y0 + tf.h + 21);
+  g.save(); g.translate(10, tf.y0 + tf.h / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText("northing [km]", 0, -8); g.restore();
+  frame(g, tf.x0, tf.y0, tf.w, tf.h);
+}
+function mapTransform(w) {
+  const ml = 54, mr = 10, mt = 6, mb = 38, pw = w - ml - mr, ph = pw * (Y1 - Y0) / (X1 - X0);
+  return { x0: ml, y0: mt, w: pw, h: ph, H: ph + mt + mb, x: (e) => ml + (e - X0) / (X1 - X0) * pw, y: (n) => mt + (Y1 - n) / (Y1 - Y0) * ph,
+    e: (px) => X0 + (px - ml) / pw * (X1 - X0), n: (py) => Y1 - (py - mt) / ph * (Y1 - Y0) };
+}
+function drawBase(g, tf) {
+  g.fillStyle = css("--soft"); g.fillRect(tf.x0, tf.y0, tf.w, tf.h);
+  if (S.shade && HILL.complete && HILL.naturalWidth) { g.globalAlpha = 0.9; g.drawImage(HILL, tf.x0, tf.y0, tf.w, tf.h); g.globalAlpha = 1; }
+}
+function drawPoints(g, tf, set, r) {
+  const d = D.data[set]; g.fillStyle = set === "gravity" ? "rgba(20,20,20,.75)" : "rgba(0,150,160,.85)";
+  for (let i = 0; i < d.e.length; i++) { g.beginPath(); g.arc(tf.x(d.e[i]), tf.y(d.n[i]), r, 0, 7); g.fill(); }
+}
+
+// ---------------------------------------------------------------- plan-view slices
+const mapCanvases = [];
+function drawMap(cv, key, partner) {
+  const tfw = cv.clientWidth || cv.parentElement.clientWidth, tf = mapTransform(tfw), { g } = fitCanvas(cv, tf.H);
+  cv._tf = tf; cv._key = key;
+  drawBase(g, tf);
+  const m = MODELS[key], L = lut(key, partner), k = S.k;
+  for (let j = P; j < ny - P; j++) for (let i = P; i < nx - P; i++) {
+    const q = m.q[cellIndex(i, j, k)]; if (q === 255) continue;
+    if (S.hideFar && isFar(m, i, j)) continue;
+    if (m.property === "units" && q === 0) { g.fillStyle = "rgba(232,232,232,.55)"; }
+    else { const c = L[q]; g.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.88)`; }
+    const x = Math.floor(tf.x(xe[i])), y = Math.floor(tf.y(ye[j + 1]));
+    g.fillRect(x, y, Math.ceil(tf.x(xe[i + 1])) - x, Math.ceil(tf.y(ye[j])) - y);
+  }
+  if (S.showData) { const d = PROPS[m.property].data; const r = Math.max(0.7, Math.min(1.3, tf.w / 520)); if (d !== "magnetic") drawPoints(g, tf, "gravity", r); if (d !== "gravity") drawPoints(g, tf, "magnetic", r); }
+  // section line
+  const ax = tf.x(S.A[0]), ay = tf.y(S.A[1]), bx = tf.x(S.B[0]), by = tf.y(S.B[1]);
+  g.strokeStyle = "#111"; g.lineWidth = 3.5; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+  g.strokeStyle = "#fff"; g.lineWidth = 1.6; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke(); g.setLineDash([]);
+  for (const [x, y, t] of [[ax, ay, "A"], [bx, by, "B"]]) {
+    g.fillStyle = css("--accent"); g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 1.5; g.stroke();
+    g.fillStyle = css("--accent-ink"); g.font = "600 11px " + css("--body"); g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(t, x, y + 0.5);
+  }
+  if (S.drawing && S.drawStep === 1) { g.fillStyle = css("--warn"); g.font = "600 12px " + css("--body"); g.textAlign = "left"; g.fillText("Now click the end point B", tf.x0 + 8, tf.y0 + 14); }
+  mapAxes(g, tf);
+}
+function renderMaps() {
+  const box = $("#maps"), keys = [modelKey(S.prop, S.run)]; if (S.cmp) keys.push(S.cmp);
+  while (mapCanvases.length < keys.length) {
+    const wrap = document.createElement("div"), lbl = document.createElement("div"), cv = document.createElement("canvas");
+    lbl.className = "lbl"; cv.className = "cv-map"; wrap.append(lbl, cv); box.append(wrap); mapCanvases.push(cv); hookMap(cv);
+  }
+  mapCanvases.forEach((cv, i) => { cv.parentElement.hidden = i >= keys.length; });
+  keys.forEach((key, i) => { const cv = mapCanvases[i]; cv.previousSibling.textContent = modelName(key); drawMap(cv, key, keys[1 - i]); });
+  $("#lab-k").textContent = `${Math.round(zc[S.k])} m (cell ${Math.round(M.hz[S.k])} m thick)`;
+  $("#map-title").textContent = `Horizontal slice at ${Math.round(zc[S.k])} m`;
+  renderColourbar(keys);
+}
+function renderColourbar(keys) {
+  const box = $("#cbar"); box.innerHTML = "";
+  keys.forEach((key, idx) => {
+    const m = MODELS[key];
+    if (m.property === "units") {
+      const lg = document.createElement("div"); lg.className = "legend";
+      lg.innerHTML = D.units_names.map((n, i) => `<span><i style="background:${UCOL[i]}"></i>${n}</span>`).join(""); box.append(lg); return;
+    }
+    if (idx === 1 && S.same && MODELS[keys[0]].property === m.property) return;
+    const sc = scaleOf(key, keys[1 - idx]), wrap = document.createElement("div"), cv = document.createElement("canvas");
+    wrap.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0"; wrap.append(cv);
+    const lab = document.createElement("span"); lab.className = "readout"; lab.textContent = `${PROPS[m.property].sym} [${PROPS[m.property].unit}]` + (keys.length > 1 ? ` · ${S.same && MODELS[keys[0]].property === MODELS[keys[1]]?.property ? "both" : modelName(key)}` : "");
+    wrap.append(lab); box.append(wrap);
+    requestAnimationFrame(() => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2), w = Math.max(200, Math.min(320, box.clientWidth - 140)), h = 34;
+      cv.style.width = w + "px"; cv.style.height = h + "px"; cv.width = w * dpr; cv.height = h * dpr; const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      for (let x = 0; x < w - 16; x++) { const c = colourOf(m, sc, sc.lo + x / (w - 17) * (sc.hi - sc.lo)); g.fillStyle = `rgb(${c.map(Math.round)})`; g.fillRect(x + 8, 2, 1.5, 14); }
+      g.fillStyle = css("--muted"); g.font = "11px " + css("--mono"); g.textBaseline = "top";
+      const ticks = m.property === "density" ? [sc.lo, 0, sc.hi] : [0, sc.hi / 2, sc.hi];
+      ticks.forEach((t) => { const x = 8 + (t - sc.lo) / (sc.hi - sc.lo) * (w - 17); g.textAlign = x < 20 ? "left" : x > w - 20 ? "right" : "center"; g.fillText(m.property === "density" ? PROPS.density.fmt(t).replace("+0.000", "0").replace("−0.000", "0") : t.toFixed(t < 0.01 && t > 0 ? 4 : 3), x, 19); });
+    });
+  });
+}
+function hookMap(cv) {
+  let drag = null;
+  const pos = (ev) => { const r = cv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  cv.addEventListener("pointerdown", (ev) => {
+    const [px, py] = pos(ev), tf = cv._tf;
+    if (S.drawing) {
+      const e = Math.max(X0, Math.min(X1, tf.e(px))), n = Math.max(Y0, Math.min(Y1, tf.n(py)));
+      if (S.drawStep === 0) { S.A = [e, n]; S.B = [e, n]; S.drawStep = 1; }
+      else { S.B = [e, n]; S.drawing = false; S.drawStep = 0; $("#btn-draw").setAttribute("aria-pressed", "false"); setCustom(); }
+      redrawModel(); return;
+    }
+    for (const [nm, p] of [["A", S.A], ["B", S.B]]) if (Math.hypot(px - tf.x(p[0]), py - tf.y(p[1])) < 14) { drag = nm; cv.setPointerCapture(ev.pointerId); return; }
+  });
+  cv.addEventListener("pointermove", (ev) => {
+    const [px, py] = pos(ev), tf = cv._tf; if (!tf) return;
+    const e = tf.e(px), n = tf.n(py);
+    if (drag) { const p = [Math.max(X0, Math.min(X1, e)), Math.max(Y0, Math.min(Y1, n))]; S[drag] = p; setCustom(); redrawModel(); return; }
+    if (S.drawing && S.drawStep === 1) { S.B = [Math.max(X0, Math.min(X1, e)), Math.max(Y0, Math.min(Y1, n))]; renderMaps(); }
+    readMap(cv._key, e, n);
+  });
+  const end = () => { if (drag) { drag = null; } };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  cv.addEventListener("pointerleave", () => { if (!drag) $("#ro-map").textContent = "Point at the map to read the model. Drag A or B to move the section."; });
+}
+function readMap(key, e, n) {
+  const i = findCell(xe, e), j = findCell(ye, n), ro = $("#ro-map");
+  if (i < P || i >= nx - P || j < P || j >= ny - P) { ro.textContent = "outside the core of the mesh"; return; }
+  const head = `E ${(e / 1000).toFixed(2)} km · N ${(n / 1000).toFixed(2)} km · ${Math.round(zc[S.k])} m`;
+  const vals = [modelKey(S.prop, S.run)].concat(S.cmp ? [S.cmp] : []).map((k) => {
+    const m = MODELS[k], q = m.q[cellIndex(i, j, S.k)];
+    if (q === 255) return `${modelName(k)}: air`;
+    const far = isFar(m, i, j) ? " (unconstrained)" : "";
+    return m.property === "units" ? `unit: ${D.units_names[q]}${far}` : `${modelName(k)}: ${PROPS[m.property].fmt(value(m, q))} ${PROPS[m.property].unit}${far}`;
+  });
+  ro.textContent = head + " · " + vals.join(" · ");
+}
+function setCustom() { S.sec = "custom"; $("#sel-sec").value = "custom"; }
+
+// ---------------------------------------------------------------- sections
+const secCanvases = [];
+function drawSection(cv, key, partner) {
+  const w = cv.clientWidth || cv.parentElement.clientWidth, ml = 54, mr = 10, mt = 18, mb = 40, pw = w - ml - mr, ph = Math.max(170, Math.min(300, pw * 0.3));
+  const { g } = fitCanvas(cv, ph + mt + mb), L = Math.hypot(S.B[0] - S.A[0], S.B[1] - S.A[1]) || 1;
+  const sx = (d) => ml + d / L * pw, sz = (z) => mt + (ZTOP - z) / (ZTOP - ZMIN) * ph;
+  cv._sec = { ml, mt, pw, ph, L, d: (px) => (px - ml) / pw * L, z: (py) => ZTOP - (py - mt) / ph * (ZTOP - ZMIN) }; cv._key = key;
+  g.fillStyle = css("--soft"); g.fillRect(ml, mt, pw, ph);
+  const m = MODELS[key], Lt = lut(key, partner), step = Math.max(20, L / pw), ns = Math.ceil(L / step);
+  for (let s = 0; s < ns; s++) {
+    const d0 = s * step, d1 = Math.min(L, d0 + step), dm = (d0 + d1) / 2, t = dm / L;
+    const e = S.A[0] + t * (S.B[0] - S.A[0]), n = S.A[1] + t * (S.B[1] - S.A[1]), i = findCell(xe, e), j = findCell(ye, n);
+    if (i < 0 || j < 0) continue;
+    const far = S.hideFar && isFar(m, i, j), x = Math.floor(sx(d0)), wpx = Math.ceil(sx(d1)) - x;
+    for (let k = KMIN; k < nz; k++) {
+      const q = m.q[cellIndex(i, j, k)]; if (q === 255 || far) continue;
+      const c = m.property === "units" && q === 0 ? [232, 232, 232] : Lt[q];
+      g.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      const y = Math.floor(sz(Math.min(ze[k + 1], ZTOP))), y1 = Math.ceil(sz(Math.max(ze[k], ZMIN))); g.fillRect(x, y, wpx, y1 - y);
+    }
+  }
+  // terrain
+  g.strokeStyle = css("--ink"); g.lineWidth = 1.4; g.beginPath();
+  for (let s = 0; s <= 200; s++) { const t = s / 200, z = terrainZ(S.A[0] + t * (S.B[0] - S.A[0]), S.A[1] + t * (S.B[1] - S.A[1])); const x = sx(t * L), y = sz(z); s ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.stroke();
+  // stations near the line
+  if (S.showData) {
+    const ux = (S.B[0] - S.A[0]) / L, uy = (S.B[1] - S.A[1]) / L, sets = PROPS[m.property].data === "both" ? ["gravity", "magnetic"] : [PROPS[m.property].data];
+    sets.forEach((set) => { const dd = D.data[set]; g.fillStyle = set === "gravity" ? css("--ink") : "rgb(0,150,160)";
+      for (let i = 0; i < dd.e.length; i++) { const rx = dd.e[i] - S.A[0], ry = dd.n[i] - S.A[1], along = rx * ux + ry * uy, off = Math.abs(-rx * uy + ry * ux);
+        if (off < 500 && along >= 0 && along <= L) { const x = sx(along), y = sz(dd.z[i]) - 3; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 3, y - 6); g.lineTo(x + 3, y - 6); g.closePath(); g.fill(); } } });
+  }
+  // slice level
+  g.strokeStyle = css("--accent"); g.setLineDash([5, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(ml, sz(zc[S.k])); g.lineTo(ml + pw, sz(zc[S.k])); g.stroke(); g.setLineDash([]);
+  // axes
+  const ink = css("--muted"); g.fillStyle = ink; g.strokeStyle = ink; g.font = "11px " + css("--mono");
+  const st = niceStep(L, Math.max(3, Math.min(10, pw / 70))); g.textAlign = "center"; g.textBaseline = "top";
+  for (let d = 0; d <= L + 1; d += st) { const x = sx(d); g.beginPath(); g.moveTo(x, mt + ph); g.lineTo(x, mt + ph + 4); g.stroke(); g.fillText((d / 1000).toFixed(st < 1000 ? 1 : 0), x, mt + ph + 6); }
+  g.fillText("distance along A→B [km]", ml + pw / 2, mt + ph + 21);
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let z = -2500; z <= ZTOP; z += 500) { const y = sz(z); g.beginPath(); g.moveTo(ml - 4, y); g.lineTo(ml, y); g.stroke(); g.fillText((z / 1000).toFixed(1), ml - 6, y); }
+  g.save(); g.translate(10, mt + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText("elevation [km]", 0, -6); g.restore();
+  g.fillStyle = css("--ink"); g.font = "600 12px " + css("--body"); g.textBaseline = "bottom"; g.textAlign = "left"; g.fillText("A", ml, mt - 3); g.textAlign = "right"; g.fillText("B", ml + pw, mt - 3);
+  g.font = "11px " + css("--mono"); g.fillStyle = ink; g.textAlign = "center"; g.fillText(`vertical exaggeration ${((ph / (ZTOP - ZMIN)) / (pw / L)).toFixed(1)}×`, ml + pw / 2, mt - 3);
+  frame(g, ml, mt, pw, ph);
+}
+function renderSections() {
+  const box = $("#secs"), keys = [modelKey(S.prop, S.run)]; if (S.cmp) keys.push(S.cmp);
+  while (secCanvases.length < keys.length) {
+    const wrap = document.createElement("div"), lbl = document.createElement("div"), cv = document.createElement("canvas");
+    lbl.className = "lbl"; cv.className = "cv-sec"; wrap.append(lbl, cv); box.append(wrap); secCanvases.push(cv); hookSection(cv);
+  }
+  secCanvases.forEach((cv, i) => { cv.parentElement.hidden = i >= keys.length; });
+  keys.forEach((key, i) => { const cv = secCanvases[i]; cv.previousSibling.textContent = modelName(key); drawSection(cv, key, keys[1 - i]); });
+  const L = Math.hypot(S.B[0] - S.A[0], S.B[1] - S.A[1]);
+  $("#sec-name").textContent = `${S.sec === "custom" ? "your line" : S.sec} · ${(L / 1000).toFixed(1)} km`;
+}
+function hookSection(cv) {
+  const pos = (ev) => { const r = cv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  cv.addEventListener("pointermove", (ev) => {
+    const s = cv._sec; if (!s) return; const [px, py] = pos(ev), d = s.d(px), z = s.z(py), ro = $("#ro-sec");
+    if (d < 0 || d > s.L || z < ZMIN || z > ZTOP) { ro.textContent = "Click the section to move the horizontal slice to that elevation."; return; }
+    const t = d / s.L, e = S.A[0] + t * (S.B[0] - S.A[0]), n = S.A[1] + t * (S.B[1] - S.A[1]), i = findCell(xe, e), j = findCell(ye, n), k = findCell(ze, z);
+    const parts = [modelKey(S.prop, S.run)].concat(S.cmp ? [S.cmp] : []).map((key) => { const m = MODELS[key], q = m.q[cellIndex(i, j, k)];
+      return q === 255 ? `${modelName(key)}: air` : m.property === "units" ? `unit: ${D.units_names[q]}` : `${modelName(key)}: ${PROPS[m.property].fmt(value(m, q))} ${PROPS[m.property].unit}`; });
+    ro.textContent = `${(d / 1000).toFixed(2)} km along · ${Math.round(z)} m · ` + parts.join(" · ");
+  });
+  cv.addEventListener("pointerdown", (ev) => {
+    const s = cv._sec; if (!s) return; const [, py] = pos(ev), z = s.z(py); if (z < ZMIN || z > ZTOP) return;
+    let k = findCell(ze, z); k = Math.max(KMIN, Math.min(nz - 1, k)); S.k = k; $("#rng-k").value = nz - 1 - k; redrawModel();
+  });
+}
+
+// ---------------------------------------------------------------- stats strip
+function fitStats(set, run) {
+  const d = D.data[set], p = d.pred[run]; let r2 = 0, c2 = 0;
+  for (let i = 0; i < d.obs.length; i++) { const r = d.obs[i] - p[i]; r2 += r * r; c2 += (r / d.unc[i]) ** 2; }
+  return { rms: Math.sqrt(r2 / d.obs.length), chi2: c2 / d.obs.length, n: d.obs.length };
+}
+function renderStats() {
+  const key = modelKey(S.prop, S.run), m = MODELS[key], box = $("#stats"), cards = [];
+  const fitCard = (set, run) => { const f = fitStats(set, run), u = set === "gravity" ? "mGal" : "nT";
+    return `<div class="stat"><div class="k">${set === "gravity" ? "Gravity" : "Magnetic"} fit</div><div class="v">χ² ${f.chi2.toFixed(2)}</div><div class="s">rms ${f.rms.toFixed(set === "gravity" ? 3 : 1)} ${u} · ${f.n} blocks</div></div>`; };
+  if (m.property === "units") {
+    cards.push(fitCard("gravity", "joint"), fitCard("magnetic", "joint"));
+    D.units_names.forEach((n, i) => { if (i) cards.push(`<div class="stat"><div class="k"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${UCOL[i]};margin-right:6px"></i>${n}</div><div class="v">${m.percent[i].toFixed(1)} %</div><div class="s">of the active cells</div></div>`); });
+  } else {
+    const pr = PROPS[m.property];
+    if (S.run === "joint") cards.push(fitCard("gravity", "joint"), fitCard("magnetic", "joint")); else cards.push(fitCard(pr.data, S.run));
+    cards.push(`<div class="stat"><div class="k">${pr.sym} range</div><div class="v">${pr.fmt(m.min)} … ${pr.fmt(m.max)}</div><div class="s">${pr.unit}${S.run === "smooth" ? "" : " · bounds " + (m.property === "density" ? "±0.3" : "0–0.3")}</div></div>`);
+    cards.push(`<div class="stat"><div class="k">Compactness</div><div class="v">${(m.compactness_90 * 100).toFixed(1)} %</div><div class="s">of the cells hold 90 % of the model</div></div>`);
+    if (S.run === "joint") { const sd = D.summary.joint.structural_dissimilarity; cards.push(`<div class="stat"><div class="k">Structural dissimilarity</div><div class="v">${sd.separate.toFixed(2)} → ${sd.joint.toFixed(3)}</div><div class="s">separate → joint (cross-gradient)</div></div>`); }
+  }
+  box.innerHTML = cards.join("");
+}
+
+// ---------------------------------------------------------------- 3-D view
+const V = { ok: false };
+function init3D() {
+  const box = $("#view3d");
+  if (typeof THREE === "undefined") { box.insertAdjacentHTML("beforeend", '<div class="nogl">The 3-D view needs three.js from cdnjs.cloudflare.com and could not load it. Slices, sections and the other tabs work without it.</div>'); return; }
+  try {
+    V.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  } catch (e) { box.insertAdjacentHTML("beforeend", '<div class="nogl">WebGL is not available in this browser, so the 3-D view is off.</div>'); return; }
+  V.ok = true; V.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); box.prepend(V.renderer.domElement);
+  V.scene = new THREE.Scene(); V.camera = new THREE.PerspectiveCamera(38, 4 / 3, 0.1, 800);
+  V.scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 0.75)); const dl = new THREE.DirectionalLight(0xffffff, 0.55); dl.position.set(-30, 50, 20); V.scene.add(dl);
+  V.box = new THREE.BoxGeometry(1, 1, 1); V.mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  V.cx = (X0 + X1) / 2; V.cy = (Y0 + Y1) / 2;
+  const tex = new THREE.Texture(HILL); if (HILL.complete) tex.needsUpdate = true; else HILL.addEventListener("load", () => { tex.needsUpdate = true; render3D(); });
+  V.tex = tex; resetCam(); hookOrbit(box);
+  new ResizeObserver(() => { size3D(); render3D(); }).observe(box); size3D();
+}
+const W3 = (e) => (e - V.cx) / 1000, N3 = (n) => -(n - V.cy) / 1000, Z3 = (z) => z / 1000 * S.ve;
+function size3D() { if (!V.ok) return; const b = $("#view3d"), w = b.clientWidth, h = b.clientHeight; V.renderer.setSize(w, h, false); V.camera.aspect = w / h; V.camera.updateProjectionMatrix(); }
+function resetCam() { V.orb = { th: -0.55, ph: 0.98, r: 44, tx: 0, ty: Z3(-600), tz: 0 }; placeCam(); }
+function placeCam() { const o = V.orb; V.camera.position.set(o.tx + o.r * Math.sin(o.ph) * Math.sin(o.th), o.ty + o.r * Math.cos(o.ph), o.tz + o.r * Math.sin(o.ph) * Math.cos(o.th)); V.camera.lookAt(o.tx, o.ty, o.tz); }
+function hookOrbit(el) {
+  const pts = new Map(); let last = null, pinch0 = null;
+  el.addEventListener("pointerdown", (ev) => { el.setPointerCapture(ev.pointerId); pts.set(ev.pointerId, [ev.clientX, ev.clientY]); last = [ev.clientX, ev.clientY]; el.style.cursor = "grabbing"; });
+  el.addEventListener("pointermove", (ev) => {
+    if (!pts.has(ev.pointerId)) return; pts.set(ev.pointerId, [ev.clientX, ev.clientY]); const o = V.orb;
+    if (pts.size === 2) { const [a, b] = [...pts.values()], dist = Math.hypot(a[0] - b[0], a[1] - b[1]), mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (pinch0) { o.r = Math.max(6, Math.min(140, o.r * pinch0.d / dist)); pan(mid[0] - pinch0.m[0], mid[1] - pinch0.m[1]); } pinch0 = { d: dist, m: mid }; placeCam(); render3D(); return; }
+    const dx = ev.clientX - last[0], dy = ev.clientY - last[1]; last = [ev.clientX, ev.clientY];
+    if (ev.shiftKey || ev.buttons === 2) pan(dx, dy); else { o.th -= dx * 0.008; o.ph = Math.max(0.08, Math.min(1.55, o.ph - dy * 0.006)); }
+    placeCam(); render3D();
+  });
+  const up = (ev) => { pts.delete(ev.pointerId); if (pts.size < 2) pinch0 = null; if (pts.size === 1) last = [...pts.values()][0]; el.style.cursor = "grab"; };
+  el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("contextmenu", (e) => e.preventDefault());
+  el.addEventListener("wheel", (ev) => { ev.preventDefault(); V.orb.r = Math.max(6, Math.min(140, V.orb.r * Math.exp(ev.deltaY * 0.0012))); placeCam(); render3D(); }, { passive: false });
+  function pan(dx, dy) { const o = V.orb, s = o.r * 0.0018, c = Math.cos(o.th), sn = Math.sin(o.th); o.tx += -dx * s * c - dy * s * sn * 0; o.tz += dx * s * sn; o.tx -= dy * s * sn; o.tz -= dy * s * c; }
+}
+function build3D() {
+  if (!V.ok) return;
+  const key = modelKey(S.prop, S.run), m = MODELS[key], L = lut(key, null), sc = scaleOf(key, null);
+  if (V.cells) { V.scene.remove(V.cells); V.cells.dispose(); }
+  const list = [], amax = sc ? Math.max(Math.abs(sc.lo), Math.abs(sc.hi)) : 0, thr = S.thr * amax;
+  for (let k = KMIN; k < nz; k++) for (let j = P; j < ny - P; j++) for (let i = P; i < nx - P; i++) {
+    const q = m.q[cellIndex(i, j, k)]; if (q === 255) continue;
+    if (S.hideFar && isFar(m, i, j)) continue;
+    if (m.property === "units") { if (q === 0) continue; } else if (Math.abs(value(m, q)) < thr) continue;
+    list.push([i, j, k, q]);
+  }
+  const mesh = new THREE.InstancedMesh(V.box, V.mat, Math.max(1, list.length)), mtx = new THREE.Matrix4(), col = new THREE.Color();
+  const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
+  list.forEach(([i, j, k, q], n) => {
+    const zt = Math.min(ze[k + 1], ZTOP), zb = Math.max(ze[k], ZMIN);
+    pos.set(W3(xc[i]), Z3((zt + zb) / 2), N3(yc[j])); scl.set(M.hx[i] / 1000, Z3(zt - zb), M.hy[j] / 1000);
+    mtx.compose(pos, quat, scl); mesh.setMatrixAt(n, mtx);
+    const c = m.property === "units" ? UCOL_RGB[q] : L[q]; col.setRGB(c[0] / 255, c[1] / 255, c[2] / 255); mesh.setColorAt(n, col);
+  });
+  mesh.count = list.length; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; mesh.instanceMatrix.needsUpdate = true;
+  V.cells = mesh; V.scene.add(mesh);
+  $("#lab-thr").textContent = m.property === "units" ? "all units but background" : `${m.property === "density" ? "|Δρ|" : "χ"} ≥ ${thr.toFixed(m.property === "density" ? 3 : 4)} ${PROPS[m.property].unit}`;
+  $("#rng-thr").disabled = m.property === "units";
+  $("#ro-3d").textContent = `${modelName(key)}: ${list.length.toLocaleString("en")} cells shown, between ${Math.round(ZTOP)} m and ${ZMIN} m elevation`;
+  buildTerrain(); buildPlanes(); render3D();
+}
+function buildTerrain() {
+  if (V.terrainMesh) { V.scene.remove(V.terrainMesh); V.terrainMesh.geometry.dispose(); }
+  const geo = new THREE.PlaneGeometry((T.x1 - T.x0) / 1000, (T.y1 - T.y0) / 1000, T.nx200 - 1, T.ny200 - 1); geo.rotateX(-Math.PI / 2);
+  const p = geo.attributes.position;
+  for (let r = 0; r < T.ny200; r++) for (let c = 0; c < T.nx200; c++) p.setY(r * T.nx200 + c, Z3(Math.max(0, Z200[r * T.nx200 + c])) + 0.002);
+  geo.translate(W3((T.x0 + T.x1) / 2), 0, N3((T.y0 + T.y1) / 2)); geo.computeVertexNormals();
+  const mat = new THREE.MeshLambertMaterial({ map: V.tex, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
+  V.terrainMesh = new THREE.Mesh(geo, mat); V.terrainMesh.renderOrder = 2; V.terrainMesh.visible = S.terrain; V.scene.add(V.terrainMesh);
+  if (!V.frame) {   // outline of the volume and a north arrow
+    const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)); V.frame = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x8a9895 })); V.scene.add(V.frame);
+    const cnv = document.createElement("canvas"); cnv.width = cnv.height = 64; const g2 = cnv.getContext("2d"); g2.fillStyle = "#0f6b62"; g2.font = "bold 44px sans-serif"; g2.textAlign = "center"; g2.textBaseline = "middle"; g2.fillText("N", 32, 34);
+    V.north = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cnv), depthTest: false })); V.north.scale.set(2, 2, 2); V.scene.add(V.north);
+    V.arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(), 3, 0x0f6b62, 0.9, 0.6); V.scene.add(V.arrow);
+  }
+  const zt = Z3(ZTOP), zb = Z3(ZMIN); V.frame.scale.set((X1 - X0) / 1000, zt - zb, (Y1 - Y0) / 1000); V.frame.position.set(0, (zt + zb) / 2, 0);
+  V.arrow.position.set(W3(X0) + 1.2, zt + 0.1, N3(Y1) + 2.6); V.north.position.set(W3(X0) + 1.2, zt + 0.3, N3(Y1) - 1.1);
+}
+function buildPlanes() {
+  if (!V.ok) return;
+  for (const k of ["slice", "section"]) if (V[k]) { V.scene.remove(V[k]); V[k].geometry.dispose(); }
+  const acc = new THREE.Color(css("--accent") || "#0f6b62");
+  const sl = new THREE.PlaneGeometry((X1 - X0) / 1000, (Y1 - Y0) / 1000); sl.rotateX(-Math.PI / 2); sl.translate(0, Z3(zc[S.k]), 0);
+  V.slice = new THREE.Mesh(sl, new THREE.MeshBasicMaterial({ color: acc, transparent: true, opacity: 0.13, depthWrite: false, side: THREE.DoubleSide }));
+  const a = [W3(S.A[0]), N3(S.A[1])], b = [W3(S.B[0]), N3(S.B[1])], zt = Z3(ZTOP), zb = Z3(ZMIN), sg = new THREE.BufferGeometry();
+  sg.setAttribute("position", new THREE.Float32BufferAttribute([a[0], zt, a[1], b[0], zt, b[1], b[0], zb, b[1], a[0], zt, a[1], b[0], zb, b[1], a[0], zb, a[1]], 3));
+  V.section = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }));
+  V.slice.visible = V.section.visible = S.planes; V.slice.renderOrder = V.section.renderOrder = 3; V.scene.add(V.slice, V.section);
+}
+let raf3 = 0;
+function render3D() { if (!V.ok || raf3) return; raf3 = requestAnimationFrame(() => { raf3 = 0; if ($("#pane-model").hidden) return; V.renderer.render(V.scene, V.camera); }); }
+
+// ---------------------------------------------------------------- data-fit tab
+const fitCanvases = [];
+function renderFit() {
+  const set = S.fset, run = S.frun, d = D.data[set], p = d.pred[run], f = fitStats(set, run), u = set === "gravity" ? "mGal" : "nT", dec = set === "gravity" ? 3 : 1;
+  const res = d.obs.map((o, i) => (o - p[i]) / d.unc[i]);
+  const maxAbs = (a) => a.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  const sorted = d.obs.map(Math.abs).sort((a, b) => a - b), lim = sorted[Math.floor(sorted.length * 0.98)];
+  $("#fit-stats").innerHTML = [
+    `<div class="stat"><div class="k">χ² (φ<sub>d</sub> / N)</div><div class="v">${f.chi2.toFixed(2)}</div><div class="s">target 1 · ${f.n} blocks</div></div>`,
+    `<div class="stat"><div class="k">rms misfit</div><div class="v">${f.rms.toFixed(dec)} ${u}</div><div class="s">median uncertainty ${[...d.unc].sort((a, b) => a - b)[d.unc.length >> 1].toFixed(dec)} ${u}</div></div>`,
+    `<div class="stat"><div class="k">Data range</div><div class="v">${Math.min(...d.obs).toFixed(dec - 1)} … ${Math.max(...d.obs).toFixed(dec - 1)}</div><div class="s">${u}, observed</div></div>`,
+    `<div class="stat"><div class="k">Largest residual</div><div class="v">${maxAbs(res).toFixed(1)} σ</div><div class="s">${res.filter((r) => Math.abs(r) > 2).length} blocks beyond 2 σ</div></div>`].join("");
+  const panels = [["Observed", d.obs, lim], ["Predicted", p, lim], ["Normalised residual", res, 3]], box = $("#fit-maps");
+  while (fitCanvases.length < 3) { const pn = document.createElement("div"); pn.className = "panel"; pn.innerHTML = `<div class="phead"><h2></h2><span class="sub"></span></div><canvas></canvas>`; box.append(pn); fitCanvases.push(pn.querySelector("canvas")); hookFit(pn.querySelector("canvas")); }
+  panels.forEach(([title, vals, l], idx) => {
+    const cv = fitCanvases[idx], pn = cv.parentElement; pn.querySelector("h2").textContent = title; pn.querySelector(".sub").textContent = idx === 2 ? "colours ±3 σ" : `colours ±${l.toFixed(dec - 1)} ${u}`;
+    const tf = mapTransform(cv.clientWidth), { g } = fitCanvas(cv, tf.H); cv._tf = tf; drawBase(g, tf);
+    const order = vals.map((v, i) => i).sort((a, b) => Math.abs(vals[a]) - Math.abs(vals[b]));
+    order.forEach((i) => { const c = ramp(RDBU_RGB, (vals[i] / l + 1) / 2).map(Math.round); g.fillStyle = `rgb(${c})`; g.strokeStyle = "rgba(0,0,0,.45)"; g.lineWidth = 0.6; g.beginPath(); g.arc(tf.x(d.e[i]), tf.y(d.n[i]), 3.6, 0, 7); g.fill(); g.stroke(); });
+    mapAxes(g, tf);
+  });
+  drawXplot(d, p, u); drawHist(res);
+}
+function hookFit(cv) {
+  cv.addEventListener("pointermove", (ev) => {
+    const r = cv.getBoundingClientRect(), tf = cv._tf; if (!tf) return; const px = ev.clientX - r.left, py = ev.clientY - r.top, d = D.data[S.fset], p = d.pred[S.frun];
+    let best = -1, bd = 12; for (let i = 0; i < d.e.length; i++) { const dd = Math.hypot(tf.x(d.e[i]) - px, tf.y(d.n[i]) - py); if (dd < bd) { bd = dd; best = i; } }
+    const u = S.fset === "gravity" ? "mGal" : "nT", dec = S.fset === "gravity" ? 3 : 1;
+    $("#ro-fit").textContent = best < 0 ? "Point at a data block to read its values." :
+      `block at E ${(d.e[best] / 1000).toFixed(2)} km, N ${(d.n[best] / 1000).toFixed(2)} km, ${Math.round(d.z[best])} m · observed ${d.obs[best].toFixed(dec)} ${u} · predicted ${p[best].toFixed(dec)} ${u} · uncertainty ${d.unc[best].toFixed(dec)} ${u} · residual ${((d.obs[best] - p[best]) / d.unc[best]).toFixed(2)} σ`;
+  });
+}
+function axesBox(g, x0, y0, w, h, xt, yt, xl, yl) {
+  const ink = css("--muted"); g.strokeStyle = css("--line"); g.fillStyle = ink; g.font = "11px " + css("--mono"); g.lineWidth = 1;
+  xt.forEach(([px, t]) => { g.beginPath(); g.moveTo(px, y0); g.lineTo(px, y0 + h); g.stroke(); g.textAlign = "center"; g.textBaseline = "top"; g.fillText(t, px, y0 + h + 5); });
+  yt.forEach(([py, t]) => { g.beginPath(); g.moveTo(x0, py); g.lineTo(x0 + w, py); g.stroke(); g.textAlign = "right"; g.textBaseline = "middle"; g.fillText(t, x0 - 6, py); });
+  g.textAlign = "center"; g.textBaseline = "top"; g.fillText(xl, x0 + w / 2, y0 + h + 20);
+  g.save(); g.translate(12, y0 + h / 2); g.rotate(-Math.PI / 2); g.textBaseline = "middle"; g.fillText(yl, 0, 0); g.restore();
+  g.strokeStyle = ink; g.strokeRect(x0 + 0.5, y0 + 0.5, w, h);
+}
+function drawXplot(d, p, u) {
+  const cv = $("#cv-xplot"), w = cv.clientWidth, H = Math.min(380, Math.max(260, w * 0.72)), { g } = fitCanvas(cv, H);
+  const ml = 62, mr = 12, mt = 10, mb = 42, pw = w - ml - mr, ph = H - mt - mb;
+  const lo = Math.min(...d.obs, ...p), hi = Math.max(...d.obs, ...p), pad = (hi - lo) * 0.04, a = lo - pad, b = hi + pad;
+  const X = (v) => ml + (v - a) / (b - a) * pw, Y = (v) => mt + ph - (v - a) / (b - a) * ph, st = niceStep(b - a, 6), ticks = [];
+  for (let t = Math.ceil(a / st) * st; t <= b; t += st) ticks.push(t);
+  const dec = st < 1 ? 1 : 0;
+  axesBox(g, ml, mt, pw, ph, ticks.map((t) => [X(t), t.toFixed(dec)]), ticks.map((t) => [Y(t), t.toFixed(dec)]), `observed [${u}]`, `predicted [${u}]`);
+  g.strokeStyle = css("--accent"); g.lineWidth = 1.4; g.beginPath(); g.moveTo(X(a), Y(a)); g.lineTo(X(b), Y(b)); g.stroke();
+  g.fillStyle = css("--ink"); g.globalAlpha = 0.55; for (let i = 0; i < d.obs.length; i++) { g.beginPath(); g.arc(X(d.obs[i]), Y(p[i]), 2.3, 0, 7); g.fill(); } g.globalAlpha = 1;
+}
+function drawHist(res) {
+  const cv = $("#cv-hist"), w = cv.clientWidth, H = Math.min(380, Math.max(260, w * 0.72)), { g } = fitCanvas(cv, H);
+  const ml = 52, mr = 12, mt = 10, mb = 42, pw = w - ml - mr, ph = H - mt - mb, a = -4, b = 4, bw = 0.25, nb = (b - a) / bw, cnt = new Array(nb).fill(0);
+  res.forEach((r) => { const i = Math.floor((Math.max(a, Math.min(b - 1e-9, r)) - a) / bw); cnt[i]++; });
+  const dens = cnt.map((c) => c / res.length / bw), top = Math.max(0.45, ...dens) * 1.08;
+  const X = (v) => ml + (v - a) / (b - a) * pw, Y = (v) => mt + ph - v / top * ph;
+  axesBox(g, ml, mt, pw, ph, [-4, -3, -2, -1, 0, 1, 2, 3, 4].map((t) => [X(t), String(t)]), [0, 0.1, 0.2, 0.3, 0.4].filter((t) => t < top).map((t) => [Y(t), t.toFixed(1)]), "residual [σ] (values beyond ±4 in the end bins)", "density");
+  g.fillStyle = css("--accent"); g.globalAlpha = 0.55; dens.forEach((v, i) => { g.fillRect(X(a + i * bw) + 0.5, Y(v), X(a + (i + 1) * bw) - X(a + i * bw) - 1, Y(0) - Y(v)); }); g.globalAlpha = 1;
+  g.strokeStyle = css("--ink"); g.lineWidth = 1.5; g.beginPath(); for (let s = 0; s <= 160; s++) { const x = a + s / 160 * (b - a), y = Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI); s ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)); } g.stroke();
+  g.fillStyle = css("--muted"); g.font = "11px " + css("--mono"); g.textAlign = "right"; g.textBaseline = "top"; g.fillText("line: standard normal", ml + pw - 6, mt + 6);
+}
+
+// ---------------------------------------------------------------- convergence tab
+function lineChart(cv, o) {
+  const w = cv.clientWidth, H = Math.min(340, Math.max(240, w * 0.6)), { g } = fitCanvas(cv, H);
+  const ml = 62, mr = 14, mt = 12, mb = 42, pw = w - ml - mr, ph = H - mt - mb;
+  const xs = o.series[0].x, xmax = Math.max(...xs), all = o.series.flatMap((s) => s.y).concat((o.hlines || []).map((h) => h.y)).filter((v) => v > 0);
+  const lmin = Math.floor(Math.log10(Math.min(...all))), lmax = Math.ceil(Math.log10(Math.max(...all)));
+  const X = (v) => ml + (v - 1) / (xmax - 1) * pw, Y = (v) => mt + ph - (Math.log10(v) - lmin) / (lmax - lmin) * ph;
+  const xt = []; const st = niceStep(xmax, 8); for (let t = st; t <= xmax; t += st) xt.push([X(t), String(t)]); xt.unshift([X(1), "1"]);
+  const yt = []; for (let e = lmin; e <= lmax; e++) yt.push([Y(10 ** e), "10" + String(e).replace(/-/, "⁻").replace(/\d/g, (c) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[c])]);
+  axesBox(g, ml, mt, pw, ph, xt, yt, "iteration", o.ylabel);
+  (o.vlines || []).forEach((v) => { g.strokeStyle = css("--muted"); g.setLineDash([5, 4]); g.beginPath(); g.moveTo(X(v.x), mt); g.lineTo(X(v.x), mt + ph); g.stroke(); g.setLineDash([]); g.fillStyle = css("--muted"); g.textAlign = "left"; g.textBaseline = "top"; g.font = "11px " + css("--mono"); g.fillText(v.label, X(v.x) + 4, mt + 4); });
+  (o.hlines || []).forEach((h) => { g.strokeStyle = h.color; g.setLineDash([2, 3]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(ml, Y(h.y)); g.lineTo(ml + pw, Y(h.y)); g.stroke(); g.setLineDash([]); });
+  o.series.forEach((s) => { g.strokeStyle = s.color; g.fillStyle = s.color; g.lineWidth = 1.8; g.beginPath(); s.x.forEach((x, i) => { const px = X(x), py = Y(Math.max(s.y[i], 10 ** lmin)); i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.stroke(); s.x.forEach((x, i) => { g.beginPath(); g.arc(X(x), Y(Math.max(s.y[i], 10 ** lmin)), 2.2, 0, 7); g.fill(); }); });
+  let ly = mt + 8; g.font = "12px " + css("--body"); g.textAlign = "right"; g.textBaseline = "middle";
+  o.series.concat(o.hlines || []).forEach((s) => { g.fillStyle = s.color; g.fillRect(ml + pw - 18, ly - 1.5, 12, 3); g.fillStyle = css("--ink"); g.fillText(s.label, ml + pw - 24, ly); ly += 17; });
+}
+function renderConv() {
+  const ink = css("--ink"), acc = css("--accent"), warn = css("--warn"), sm = D.summary;
+  const lg = D.logs.gravity.compact, lm = D.logs.magnetic.compact, lj = D.logs.joint;
+  lineChart($("#cv-cg"), { ylabel: "φ_d and β", series: [{ x: lg.iteration, y: lg.phi_d, color: acc, label: "data misfit φ_d" }, { x: lg.iteration, y: lg.beta, color: warn, label: "β" }],
+    hlines: [{ y: sm.gravity.data, color: ink, label: `target ${sm.gravity.data}` }], vlines: [{ x: sm.gravity.irls_start, label: "IRLS starts" }] });
+  lineChart($("#cv-cm"), { ylabel: "φ_d and β", series: [{ x: lm.iteration, y: lm.phi_d, color: acc, label: "data misfit φ_d" }, { x: lm.iteration, y: lm.beta, color: warn, label: "β" }],
+    hlines: [{ y: sm.magnetic.data, color: ink, label: `target ${sm.magnetic.data}` }], vlines: [{ x: sm.magnetic.irls_start, label: "IRLS starts" }] });
+  lineChart($("#cv-cj"), { ylabel: "data misfit φ_d", series: [{ x: lj.iteration, y: lj.phi_d_1, color: "#c0392b", label: "gravity" }, { x: lj.iteration, y: lj.phi_d_2, color: "#2471a3", label: "magnetics" }, { x: lj.iteration, y: lj.phi_d_1.map((v, i) => v + lj.phi_d_2[i]), color: ink, label: "total" }],
+    hlines: [{ y: sm.gravity.data + sm.magnetic.data, color: ink, label: `joint target ${sm.gravity.data + sm.magnetic.data}` }], vlines: [{ x: sm.joint.irls_start, label: "IRLS starts" }] });
+  lineChart($("#cv-cx"), { ylabel: "cross-gradient term", series: [{ x: lj.iteration, y: lj.cross_gradient, color: acc, label: "cross-gradient (before λ)" }], vlines: [{ x: sm.joint.irls_start, label: "IRLS starts" }] });
+  const fg = (run) => fitStats("gravity", run), fm = (run) => fitStats("magnetic", run), c = (k) => (MODELS[k].compactness_90 * 100).toFixed(1) + " %";
+  const rows = [
+    ["Gravity · smooth (06)", sm.gravity.smooth.iterations, "—", fg("smooth").chi2.toFixed(2), fg("smooth").rms.toFixed(3) + " mGal", c("rho_smooth")],
+    ["Gravity · compact (06)", sm.gravity.iterations, sm.gravity.seconds.toFixed(0) + " s", fg("compact").chi2.toFixed(2), fg("compact").rms.toFixed(3) + " mGal", c("rho_compact")],
+    ["Magnetics · smooth (07)", sm.magnetic.smooth.iterations, "—", fm("smooth").chi2.toFixed(2), fm("smooth").rms.toFixed(1) + " nT", c("chi_smooth")],
+    ["Magnetics · compact (07)", sm.magnetic.iterations, sm.magnetic.seconds.toFixed(0) + " s", fm("compact").chi2.toFixed(2), fm("compact").rms.toFixed(1) + " nT", c("chi_compact")],
+    ["Joint · compact (08), gravity", sm.joint.iterations, sm.joint.seconds.toFixed(0) + " s", fg("joint").chi2.toFixed(2), fg("joint").rms.toFixed(3) + " mGal", c("rho_joint")],
+    ["Joint · compact (08), magnetics", "", "", fm("joint").chi2.toFixed(2), fm("joint").rms.toFixed(1) + " nT", c("chi_joint")]];
+  $("#tbl-runs").innerHTML = "<thead><tr><th>Run</th><th>Iterations</th><th>Time</th><th>χ²</th><th>rms misfit</th><th>Compactness</th></tr></thead><tbody>" +
+    rows.map((r) => `<tr><td>${r[0]}</td>${r.slice(1).map((v) => `<td class="m">${v}</td>`).join("")}</tr>`).join("") + "</tbody>";
+}
+
+// ---------------------------------------------------------------- wiring
+function seg(id, get, set) {
+  const el = $(id); el.addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (!b || b.disabled) return; set(b.dataset.v); sync(); });
+  return () => el.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === get())));
+}
+const syncers = [
+  seg("#seg-prop", () => S.prop, (v) => { S.prop = v; if (v === "units") S.run = "joint"; redrawModel(true); }),
+  seg("#seg-run", () => S.run, (v) => { S.run = v; redrawModel(true); }),
+  seg("#seg-fset", () => S.fset, (v) => { S.fset = v; renderFit(); }),
+  seg("#seg-frun", () => S.frun, (v) => { S.frun = v; renderFit(); }),
+];
+function sync() {
+  syncers.forEach((f) => f());
+  $("#seg-run").querySelectorAll("button").forEach((b) => { b.disabled = S.prop === "units" && b.dataset.v !== "joint"; });
+  const own = modelKey(S.prop, S.run), sel = $("#sel-cmp");
+  sel.innerHTML = '<option value="">nothing</option>' + Object.keys(MODELS).filter((k) => k !== own).map((k) => `<option value="${k}">${modelName(k)}</option>`).join("");
+  if (S.cmp === own) S.cmp = ""; sel.value = S.cmp;
+  $("#lab-same").hidden = !(S.cmp && MODELS[S.cmp].property === MODELS[own].property && MODELS[own].property !== "units");
+}
+function redrawModel(rebuild3d) { renderStats(); renderMaps(); renderSections(); if (rebuild3d) build3D(); else { buildPlanes(); render3D(); } }
+function redraw() { if (!$("#pane-model").hidden) redrawModel(false); if (!$("#pane-fit").hidden) renderFit(); if (!$("#pane-conv").hidden) renderConv(); }
+
+$("#sel-cmp").addEventListener("change", (e) => { S.cmp = e.target.value; sync(); redrawModel(false); });
+$("#chk-same").addEventListener("change", (e) => { S.same = e.target.checked; redrawModel(false); });
+$("#chk-far").addEventListener("change", (e) => { S.hideFar = e.target.checked; redrawModel(true); });
+$("#chk-data").addEventListener("change", (e) => { S.showData = e.target.checked; redrawModel(false); });
+$("#chk-shade").addEventListener("change", (e) => { S.shade = e.target.checked; redrawModel(false); });
+const rk = $("#rng-k"); rk.min = 0; rk.max = nz - 1 - KMIN; rk.value = nz - 1 - S.k;
+rk.addEventListener("input", () => { S.k = nz - 1 - Number(rk.value); redrawModel(false); });
+$("#rng-thr").addEventListener("input", (e) => { S.thr = e.target.value / 100; build3D(); });
+$("#rng-ve").addEventListener("input", (e) => { S.ve = Number(e.target.value); $("#lab-ve").textContent = S.ve + "×"; if (V.ok) { V.orb.ty = Z3(-600); placeCam(); build3D(); } });
+$("#lab-ve").textContent = S.ve + "×";
+$("#chk-terrain").addEventListener("change", (e) => { S.terrain = e.target.checked; if (V.terrainMesh) V.terrainMesh.visible = S.terrain; render3D(); });
+$("#chk-planes").addEventListener("change", (e) => { S.planes = e.target.checked; buildPlanes(); render3D(); });
+$("#btn-reset3d").addEventListener("click", () => { if (V.ok) { resetCam(); render3D(); } });
+const ss = $("#sel-sec"); ss.innerHTML = Object.keys(SECS).map((k) => `<option value="${k}">${k}</option>`).join("") + '<option value="custom">your line</option>';
+ss.addEventListener("change", () => { if (ss.value !== "custom") { S.sec = ss.value; S.A = SECS[ss.value][0].slice(); S.B = SECS[ss.value][1].slice(); redrawModel(false); } });
+$("#btn-draw").addEventListener("click", (e) => { S.drawing = !S.drawing; S.drawStep = 0; e.currentTarget.setAttribute("aria-pressed", String(S.drawing)); $("#ro-map").textContent = S.drawing ? "Click the start point A on the map, then the end point B." : ""; renderMaps(); });
+document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+function showTab(t) {
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  for (const p of ["model", "fit", "conv", "about"]) $("#pane-" + p).hidden = p !== t;
+  try { localStorage.setItem("wgie-tab", t); } catch (e) { /* storage unavailable */ }
+  if (t === "model") { redrawModel(false); size3D(); render3D(); }
+  if (t === "fit") renderFit();
+  if (t === "conv") renderConv();
+}
+$("#ab-ng").textContent = D.data.gravity.e.length; $("#ab-nm").textContent = D.data.magnetic.e.length;
+$("#ab-mesh").textContent = `${nx} × ${ny} × ${nz} = ${(nx * ny * nz).toLocaleString("en")}`;
+let rt = 0; const ro = new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(redraw, 60); }); ro.observe(document.querySelector(".wrap"));
+const mq = matchMedia("(prefers-color-scheme: dark)"); mq.addEventListener?.("change", redraw);
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+sync(); init3D(); build3D(); showTab(S.tab || "model");
+</script>

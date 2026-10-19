@@ -20,7 +20,7 @@ With conda or mamba (recommended: rasterio and pyproj come with their binary lib
 ```bash
 conda env create -f environment.yml
 conda activate wghadir
-python -m pytest -q              # 17 tests, about 10 s
+python -m pytest -q              # 18 tests, about 10 s
 ```
 
 With pip, using an existing Python ≥ 3.10:
@@ -77,6 +77,12 @@ susceptibility and remanence), a 2-D susceptibility inversion with χ ≥ 0 and 
 notebook 05. Rebuild it with `python scripts/build_magnetic_lab.py`. Rebuild it after changing the
 Python results with `python scripts/build_gravity_lab.py`; its sources are in `web/src/`.
 
+**Inversion explorer:** `web/Wadi_Ghadir_Inversion_Explorer.html` shows the SimPEG inversions of notebooks 06–08
+interactively: horizontal slices at any elevation, vertical sections along preset or hand-drawn lines, a 3-D view of
+the anomalous cells under the terrain, side-by-side comparison of any two models (compact, smooth, joint, joint
+units), the data fit of every model (maps, cross-plot, residual histogram) and the convergence of every run. Rebuild it
+with `python scripts/build_inversion_explorer.py` after running the notebooks.
+
 **From the command line:**
 
 ```bash
@@ -85,6 +91,7 @@ python scripts/run_gravity.py            # gravity only   (--no-figures: ~1 min)
 python scripts/run_magnetics.py          # magnetics only (~1 min)
 python scripts/build_gravity_lab.py      # rebuild web/Wadi_Ghadir_Gravity_Lab.html
 python scripts/build_magnetic_lab.py     # rebuild web/Wadi_Ghadir_Magnetic_Lab.html
+python scripts/build_inversion_explorer.py  # rebuild web/Wadi_Ghadir_Inversion_Explorer.html
 ```
 
 **From Python:**
@@ -133,7 +140,7 @@ environment.yml, requirements.txt, pyproject.toml   installation
 notebooks/                 01_Gravity_Processing, 02_Magnetic_Processing, 03_Gravity_OpenSource_Workflow,
                            04_Section_Modelling_pyGIMLi_SimPEG, 05_Magnetic_Modelling_pyGIMLi_SimPEG,
                            06/07/08_SimPEG_{Gravity,Magnetic,Joint}_Inversion (.ipynb); html/ (web versions)
-web/                       Wadi_Ghadir_Gravity_Lab.html, Wadi_Ghadir_Magnetic_Lab.html (interactive labs), sources in web/src/
+web/                       Wadi_Ghadir_Gravity_Lab.html, Wadi_Ghadir_Magnetic_Lab.html (interactive labs), Wadi_Ghadir_Inversion_Explorer.html, sources in web/src/
 third_party/sgtool/        SGTool filter engine (MIT, vendored unchanged; see its README)
 scripts/                   run_all.py, run_gravity.py, run_magnetics.py, build_report_html.py, make_package.py
 wghadir/

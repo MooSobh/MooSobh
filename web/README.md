@@ -68,3 +68,18 @@ Sources: `mag_body.html`, `mag_engine.js` (engine, no DOM) and `mag_lab.js`, wit
 `gl_core.js`, `ui_core.js`, `engine.js` and `model.js`. Build with `python scripts/build_magnetic_lab.py` after the
 magnetic chain (and notebook 05 for chapter 5.4). `web/examples/example_magnetic_readings.csv` is the Wadi Ghadir
 workbook as a CSV, to try the upload. `tests/test_core.py::test_web_magnetic_lab_engine` checks the engine in Node.
+
+## Wadi Ghadir Inversion Explorer
+
+`Wadi_Ghadir_Inversion_Explorer.html` shows the 3-D SimPEG inversions of notebooks 06–08 (compact, smooth and joint
+models on the common mesh). It needs no server; the 3-D view loads three.js r128 from cdnjs and the rest works without it.
+
+| View | Content |
+|---|---|
+| Models | horizontal slice at any mesh layer over the Copernicus relief; vertical section along preset lines (A–B of notebook 04, the S–N line of notebook 05, W–E and S–N through the centre) or a line drawn and dragged on the map; 3-D cells above a threshold under the terrain, with the slice and section planes; any two models side by side (optionally on one colour scale); cells farther than 2.5 km from the data hidden on request |
+| Data fit | observed, predicted and normalised-residual maps of the gravity and magnetic blocks for each model, observed against predicted, residual histogram against a standard normal curve, χ² and rms |
+| Convergence | φ_d and β per iteration with the IRLS start, the joint misfits and cross-gradient term, and a table of all runs with compactness |
+
+Built by `python scripts/build_inversion_explorer.py` from `outputs/inversion/` (models quantised to one byte per cell);
+it forward-models the smooth and joint models with SimPEG for the data-fit view and checks that the compact predictions
+reproduce those of the notebooks. Source: `src/inv_explorer.html`.

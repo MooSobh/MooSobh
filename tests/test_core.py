@@ -238,3 +238,16 @@ def test_inversion_helpers():
     _, s_same = W.cross_gradient(mesh, active, a, 2 * a + 1)
     _, s_diff = W.cross_gradient(mesh, active, a, x / 1000)
     assert s_same < 1e-10 and s_diff > 0.1
+
+
+def test_inversion_explorer_packing():
+    """scripts/build_inversion_explorer.py: one-byte quantisation (255 = air) and the compactness measure."""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    import build_inversion_explorer as X
+    full = np.array([np.nan, -0.3, 0.0, 0.3, 0.15])
+    active = np.isfinite(full)
+    q = X.quantise(full, active, -0.3, 0.3)
+    assert q.tolist() == [255, 0, 127, 254, 190]
+    assert abs(-0.3 + q[4] / 254 * 0.6 - 0.15) < 0.6 / 254
+    assert X.compactness(np.r_[np.ones(9), np.zeros(91)]) == 0.09
+    assert abs(X.compactness(np.ones(100)) - 0.90) < 1e-12
