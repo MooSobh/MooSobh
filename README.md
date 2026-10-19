@@ -20,7 +20,7 @@ With conda or mamba (recommended: rasterio and pyproj come with their binary lib
 ```bash
 conda env create -f environment.yml
 conda activate wghadir
-python -m pytest -q              # 16 tests, about 10 s
+python -m pytest -q              # 17 tests, about 10 s
 ```
 
 With pip, using an existing Python ≥ 3.10:
@@ -51,6 +51,12 @@ jupyter lab notebooks/
   best-fitting block and a depth-weighted inversion with **pyGIMLi** (`MagneticsModelling`, Holstein kernels) and a
   susceptibility inversion with χ ≥ 0 with **SimPEG**, cut along a north–south section. Results go to
   `outputs/modelling_magnetic/`.
+* `notebooks/06_SimPEG_Gravity_Inversion.ipynb`, `07_SimPEG_Magnetic_Inversion.ipynb` and `08_SimPEG_Joint_Inversion.ipynb`:
+  3-D inversions of the whole survey with **SimPEG** on one common mesh below the Copernicus topography: density
+  contrast from the residual complete Bouguer stations (06), susceptibility with χ ≥ 0 from the magnetic readings (07),
+  and both together coupled by a **cross-gradient** term (08), with data fits, slices, sections, structural similarity
+  and a joint classification. Shared code: `wghadir/inversion.py`; results in `outputs/inversion/` (NumPy, UBC-GIF, CSV).
+  The executed notebooks are also in `notebooks/html/` as stand-alone web pages.
 
 Each step has a **✏️ PARAMETERS** cell (thresholds, densities, grid spacing and so on, all editable), a **▶ PROCESSING**
 cell that calls the `wghadir` functions directly, and a **📊 RESULT** cell with tables and plots made in the notebook.
@@ -123,7 +129,8 @@ All tunable values are in `wghadir/gravity/settings.py` and `wghadir/magnetic/se
 ```
 environment.yml, requirements.txt, pyproject.toml   installation
 notebooks/                 01_Gravity_Processing, 02_Magnetic_Processing, 03_Gravity_OpenSource_Workflow,
-                           04_Section_Modelling_pyGIMLi_SimPEG, 05_Magnetic_Modelling_pyGIMLi_SimPEG (.ipynb)
+                           04_Section_Modelling_pyGIMLi_SimPEG, 05_Magnetic_Modelling_pyGIMLi_SimPEG,
+                           06/07/08_SimPEG_{Gravity,Magnetic,Joint}_Inversion (.ipynb); html/ (web versions)
 web/                       Wadi_Ghadir_Gravity_Lab.html, Wadi_Ghadir_Magnetic_Lab.html (interactive labs), sources in web/src/
 third_party/sgtool/        SGTool filter engine (MIT, vendored unchanged; see its README)
 scripts/                   run_all.py, run_gravity.py, run_magnetics.py, build_report_html.py, make_package.py
@@ -139,7 +146,8 @@ tests/                     regression tests (python -m pytest -q)
 data/raw/                  supplied files, unchanged (SHA-256 in outputs/tables/01_file_inventory.csv)
 data/external/             Copernicus GLO-30 and EGM2008 windows used (with provenance)
 outputs/                   results: deliverables/, tables/, maps/, grids/, figures/, nettleton/, magnetics/,
-                           open_source/ (notebook 03), modelling/ (notebook 04), modelling_magnetic/ (notebook 05)
+                           open_source/ (notebook 03), modelling/ (notebook 04), modelling_magnetic/ (notebook 05),
+                           inversion/ (notebooks 06-08)
 report/                    REPORT.md and REPORT.html
 reference_results/         (zip only) delivered result sheets and summaries, to compare a local run with
 ```

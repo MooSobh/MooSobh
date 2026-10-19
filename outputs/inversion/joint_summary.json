@@ -1,0 +1,40 @@
+{
+ "written_by": "Mohamed Sobh, LIAG",
+ "lambda_cg": 1000000000.0,
+ "iterations": 27,
+ "seconds": 128.2,
+ "gravity": {
+  "data": 481,
+  "rms_mgal": 0.1061726627240637,
+  "chi2": 0.9925455397945836
+ },
+ "magnetics": {
+  "data": 496,
+  "rms_nT": 42.90316668295386,
+  "chi2": 0.8492065023637617
+ },
+ "structural_dissimilarity": {
+  "separate": 0.33007154131069405,
+  "joint": 0.0435169375374773
+ },
+ "units_percent": {
+  "separate": {
+   "background": 56.28,
+   "dense, magnetic": 2.71,
+   "dense, non-magnetic": 11.87,
+   "light, magnetic": 13.71,
+   "light, non-magnetic": 15.43
+  },
+  "joint": {
+   "background": 56.11,
+   "dense, magnetic": 2.32,
+   "dense, non-magnetic": 11.85,
+   "light, magnetic": 14.3,
+   "light, non-magnetic": 15.42
+  }
+ },
+ "thresholds": {
+  "rho_gcc": 0.02,
+  "chi_SI": 0.005
+ }
+}

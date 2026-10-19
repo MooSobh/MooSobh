@@ -1,0 +1,35 @@
+{
+ "written_by": "Mohamed Sobh, LIAG",
+ "data": 481,
+ "stations": 984,
+ "regional": "upward",
+ "block_m": 400.0,
+ "uncertainty": {
+  "floor_mgal": 0.05,
+  "percent": 0.02
+ },
+ "mesh": [
+  81,
+  57,
+  28
+ ],
+ "active_cells": 105895,
+ "iterations": 9,
+ "seconds": 8.1,
+ "chi2": 0.8821821374167857,
+ "rms_mgal": 0.10658827558911756,
+ "rho_range_gcc": [
+  -0.14101714670104504,
+  0.13504799662227596
+ ],
+ "alphas": [
+  1.0,
+  1.0,
+  1.0,
+  1.0
+ ],
+ "bounds": [
+  -1.0,
+  1.0
+ ]
+}

@@ -219,3 +219,22 @@ console.log(JSON.stringify({{F:b.F,I:b.I,D:b.D,rows:L.d.map(r=>[r.row,r.ok?1:0,r
     assert np.nanmax(np.abs(js_rows["tma"] - js_rows["tma_nT"])) < 0.1
     line = [2e-7 * 400 * (500 ** 2 - x ** 2) / (x ** 2 + 500 ** 2) ** 2 * 1e9 for x in (0, 300)]
     assert np.allclose(out["dip"], line, rtol=1e-4)
+
+
+def test_inversion_helpers():
+    """wghadir.inversion: block median, polynomial trend and the cross-gradient measure."""
+    import discretize
+    from wghadir import inversion as W
+    rng = np.random.default_rng(1)
+    df = pd.DataFrame({"e": rng.uniform(0, 1000, 500), "n": rng.uniform(0, 1000, 500), "z": 0.0})
+    df["v"] = 3 + 0.002 * df.e - 0.001 * df.n
+    assert np.allclose(W.polynomial_trend(df.e.values, df.n.values, df.v.values, 1), df.v.values)
+    b = W.block_median(df, ["v"], 250.0)
+    assert len(b) == 16 and b.n_block.sum() == 500
+    mesh = discretize.TensorMesh([np.ones(12) * 100, np.ones(10) * 100, np.ones(8) * 100])
+    active = np.ones(mesh.n_cells, bool)
+    x, y, z = mesh.cell_centers.T
+    a = np.exp(-((x - 600) ** 2 + (y - 500) ** 2 + (z - 400) ** 2) / 2e5)
+    _, s_same = W.cross_gradient(mesh, active, a, 2 * a + 1)
+    _, s_diff = W.cross_gradient(mesh, active, a, x / 1000)
+    assert s_same < 1e-10 and s_diff > 0.1
