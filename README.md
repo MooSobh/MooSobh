@@ -55,7 +55,9 @@ jupyter lab notebooks/
   3-D inversions of the whole survey with **SimPEG** on one common mesh below the Copernicus topography: density
   contrast from the residual complete Bouguer stations (06), susceptibility with χ ≥ 0 from the magnetic readings (07),
   and both together coupled by a **cross-gradient** term (08), with data fits, slices, sections, structural similarity
-  and a joint classification. Shared code: `wghadir/inversion.py`; results in `outputs/inversion/` (NumPy, UBC-GIF, CSV).
+  and a joint classification. All three are **compact inversions**: sparse norms (p = 0 on the model, p = 1 on its
+  gradients) solved by iteratively re-weighted least squares (IRLS) within realistic bounds (Δρ ±0.3 g/cm³,
+  χ 0–0.3 SI); the smooth L2 models are run first and kept for comparison. Shared code: `wghadir/inversion.py`; results in `outputs/inversion/` (NumPy, UBC-GIF, CSV).
   The executed notebooks are also in `notebooks/html/` as stand-alone web pages.
 
 Each step has a **✏️ PARAMETERS** cell (thresholds, densities, grid spacing and so on, all editable), a **▶ PROCESSING**

@@ -1,36 +1,43 @@
 {
  "written_by": "Mohamed Sobh, LIAG",
  "lambda_cg": 1000000000.0,
- "iterations": 27,
- "seconds": 128.2,
+ "norms": [
+  0.0,
+  1.0,
+  1.0,
+  1.0
+ ],
+ "irls_start": 10,
+ "iterations": 40,
+ "seconds": 198.8,
  "gravity": {
   "data": 481,
-  "rms_mgal": 0.1061726627240637,
-  "chi2": 0.9925455397945836
+  "rms_mgal": 0.0705530457997933,
+  "chi2": 0.5646396393894821
  },
  "magnetics": {
   "data": 496,
-  "rms_nT": 42.90316668295386,
-  "chi2": 0.8492065023637617
+  "rms_nT": 24.526932372946582,
+  "chi2": 1.2608537742726753
  },
  "structural_dissimilarity": {
-  "separate": 0.33007154131069405,
-  "joint": 0.0435169375374773
+  "separate": 0.2585509107424158,
+  "joint": 0.07310362587786204
  },
  "units_percent": {
   "separate": {
-   "background": 56.28,
-   "dense, magnetic": 2.71,
-   "dense, non-magnetic": 11.87,
-   "light, magnetic": 13.71,
-   "light, non-magnetic": 15.43
+   "background": 88.29,
+   "dense, magnetic": 0.15,
+   "dense, non-magnetic": 3.34,
+   "light, magnetic": 0.26,
+   "light, non-magnetic": 7.96
   },
   "joint": {
-   "background": 56.11,
-   "dense, magnetic": 2.32,
-   "dense, non-magnetic": 11.85,
-   "light, magnetic": 14.3,
-   "light, non-magnetic": 15.42
+   "background": 86.59,
+   "dense, magnetic": 0.19,
+   "dense, non-magnetic": 3.86,
+   "light, magnetic": 0.66,
+   "light, non-magnetic": 8.7
   }
  },
  "thresholds": {

@@ -244,8 +244,11 @@ def joint_iteration_log():
 
         def endIter(self):
             ip = self.invProb
-            phi = list(getattr(ip, "phi_d_list", [np.nan, np.nan]))
-            betas = list(np.atleast_1d(getattr(ip, "betas", [np.nan, np.nan])))
+            phi = getattr(ip, "phi_d_list", None)
+            if phi is None:                          # single-beta joint inversion: evaluate each misfit
+                phi = [dm(ip.model) for dm in self.dmisfit.objfcts]
+            phi = list(phi)
+            betas = list(np.atleast_1d(getattr(ip, "betas", None) if getattr(ip, "betas", None) is not None else ip.beta))
             cg = ip.reg.objfcts[-1](ip.model)
             self.rows.append({"iteration": self.opt.iter, "beta_1": float(betas[0]), "beta_2": float(betas[-1]),
                               "phi_d_1": float(phi[0]), "phi_d_2": float(phi[-1]), "cross_gradient": float(cg)})
