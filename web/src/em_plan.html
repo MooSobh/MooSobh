@@ -1,0 +1,423 @@
+<title>Wadi Ghadir EM Survey Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="author" content="Mohamed Sobh, LIAG">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: a field-planning console. Summary strip, then the plan map beside the selected line's card; the section with live depth of investigation below; field files at the end. */
+:root {
+  --bg: #eceeec; --panel: #fbfcfb; --ink: #16201e; --muted: #5a6764; --line: #d3d9d7; --soft: #e2e7e5;
+  --accent: #0f6b62; --accent-ink: #ffffff; --tem: #2e7d32; --amt: #d35400; --warn: #a2470d;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1312; --panel: #151c1b; --ink: #e2eae8; --muted: #92a19d; --line: #293432; --soft: #1d2624;
+  --accent: #4cc0ae; --accent-ink: #06201c; --tem: #7bc67e; --amt: #f39c5a; --warn: #f0a46a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1312; --panel: #151c1b; --ink: #e2eae8; --muted: #92a19d; --line: #293432; --soft: #1d2624;
+  --accent: #4cc0ae; --accent-ink: #06201c; --tem: #7bc67e; --amt: #f39c5a; --warn: #f0a46a; color-scheme: dark }
+html, body { background: var(--bg); color: var(--ink); }
+body { font: 15px/1.5 var(--body); }
+.wrap { max-width: 1480px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 22px 40px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 700 clamp(28px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.01em; margin: 6px 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 75ch; }
+.byline { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.byline b { color: var(--ink); font-weight: 600; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px; min-width: 0; }
+.k { font: 500 11px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font: 500 20px/1.3 var(--mono); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.stat .s { font-size: 12.5px; color: var(--muted); }
+.stat input { width: 3.4em; font: 13px var(--mono); padding: 2px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 980px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; min-width: 0; display: grid; gap: 10px; align-content: start; }
+.phead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; }
+.phead h2 { font: 600 17px/1.2 var(--display); margin: 0; }
+.sub { font: 12.5px var(--mono); color: var(--muted); }
+.ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { font: 500 13.5px var(--body); border: 0; background: transparent; color: var(--ink); padding: 6px 11px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+select { font: 13.5px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 100%; }
+label.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; }
+input[type="range"] { accent-color: var(--accent); width: 170px; max-width: 100%; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { font: 500 13.5px var(--body); border: 1px solid var(--accent); color: var(--accent); background: transparent; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.btn:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+canvas { display: block; width: 100%; touch-action: manipulation; }
+#cv-map { cursor: pointer; }
+.readout { font: 12.5px var(--mono); color: var(--muted); min-height: 1.5em; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.lines { display: flex; flex-wrap: wrap; gap: 6px; }
+.lines button { font: 500 13px var(--mono); border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 5px 9px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.lines button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.card h3 { font: 700 22px/1.1 var(--display); margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 12px var(--mono); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
+.chip.p1 { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: var(--accent); }
+.chip.tem { color: var(--tem); border-color: var(--tem); }
+.chip.amt { color: var(--amt); border-color: var(--amt); }
+dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 14px; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.note { font-size: 13.5px; color: var(--muted); max-width: 85ch; margin: 0; }
+.chartgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .chartgrid { grid-template-columns: minmax(0, 1fr); } }
+.tblwrap { overflow: auto; max-height: 360px; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; min-width: 620px; }
+th, td { text-align: right; padding: 5px 9px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; font-family: var(--mono); }
+th:first-child, td:first-child { text-align: left; }
+th { position: sticky; top: 0; background: var(--panel); font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.dl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.steps h3 { font: 600 15px var(--display); margin: 0 0 4px; }
+.steps p { margin: 0; font-size: 13.5px; }
+footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Wadi Ghadir · Eastern Desert, Egypt · ground EM survey design</div>
+  <h1>EM Survey Planner</h1>
+  <p class="lede">Where to measure TEM and AMT, and how deep to expect the targets, from the compact joint gravity–magnetic inversion. Pick a line on the map, set the host resistivity and loop, and see how far each sounding reaches against the target.</p>
+  <div class="byline"><b>Written by Mohamed Sobh, LIAG</b> · Leibniz Institute for Applied Geophysics, Hannover</div>
+</header>
+
+<div class="stats" id="stats"></div>
+
+<div class="grid2">
+  <div class="panel">
+    <div class="phead"><h2>Plan map</h2>
+      <div class="ctl"><div class="seg" id="seg-layer"><button data-v="relief" aria-pressed="false">Relief</button><button data-v="grav" aria-pressed="true">Residual gravity</button><button data-v="rtp" aria-pressed="false">RTP magnetics</button></div></div></div>
+    <div class="ctl">
+      <label class="chk"><input type="checkbox" id="chk-tracks" checked> existing survey tracks</label>
+      <label class="chk"><input type="checkbox" id="chk-targets" checked> target footprints</label>
+      <label class="chk"><input type="checkbox" id="chk-st" checked> stations</label>
+    </div>
+    <canvas id="cv-map" aria-label="Plan map of the EM lines, stations and targets"></canvas>
+    <div class="readout" id="ro-map">Click a line to select it. Point at a station or a target for details.</div>
+    <div class="ctl" id="legend-map"></div>
+  </div>
+  <div class="panel card" id="card"></div>
+</div>
+
+<div class="panel">
+  <div class="phead"><h2>Section and depth of investigation <span class="sub" id="sec-name"></span></h2>
+    <div class="ctl"><div class="seg" id="seg-prop"><button data-v="rho" aria-pressed="true">Density Δρ</button><button data-v="chi" aria-pressed="false">Susceptibility χ</button></div></div></div>
+  <div class="ctl" style="gap:10px 22px">
+    <div class="ctl"><label class="k" for="rng-rho">Host resistivity</label><input type="range" id="rng-rho" min="0" max="4" step="0.05" value="2.5"><span class="sub" id="lab-rho"></span></div>
+    <div class="ctl"><label class="k" for="sel-loop">TEM loop</label><select id="sel-loop"><option value="plan">as planned</option><option value="50">50 m</option><option value="100">100 m</option><option value="200">200 m</option><option value="400">400 m</option></select></div>
+    <div class="ctl"><label class="k" for="sel-cur">Current</label><select id="sel-cur"><option value="5">5 A</option><option value="10" selected>10 A</option><option value="20">20 A</option><option value="40">40 A</option></select></div>
+    <div class="ctl"><label class="k" for="sel-noise">Noise</label><select id="sel-noise"><option value="1e-9">low (1 nV/m²)</option><option value="1e-8" selected>moderate (10 nV/m²)</option><option value="1e-7">high (100 nV/m²)</option></select></div>
+    <div class="ctl"><label class="k" for="sel-f">AMT lowest f</label><select id="sel-f"><option value="10" selected>10 Hz</option><option value="1">1 Hz</option><option value="100">100 Hz</option></select></div>
+  </div>
+  <canvas id="cv-sec" aria-label="Vertical section along the selected line"></canvas>
+  <div class="readout" id="ro-sec">Point at the section to read the model.</div>
+  <p class="note" id="sec-verdict"></p>
+</div>
+
+<div class="chartgrid">
+  <div class="panel"><div class="phead"><h2>How deep each set-up sees</h2><span class="sub">rules of thumb</span></div><canvas id="cv-doi"></canvas>
+    <p class="note">TEM: Spies (1989), 0.55 (M ρ / η)<sup>1/5</sup>, capped by the diffusion depth at the 10 ms gate. AMT: Bostick depth 356 √(ρ / f). The vertical line is the host resistivity chosen above.</p></div>
+  <div class="panel"><div class="phead"><h2>Expected resistivities</h2><span class="sub">typical ranges</span></div><canvas id="cv-res"></canvas>
+    <p class="note">Basement host rocks are resistive, so good EM targets are conductors (sulphides, graphite, altered shear zones) at the contacts of the gravity and magnetic bodies.</p></div>
+</div>
+
+<div class="panel">
+  <div class="phead"><h2>Stations <span class="sub" id="st-name"></span></h2>
+    <div class="dl"><button class="btn" id="dl-csv">Stations (CSV)</button><button class="btn" id="dl-gpx">Field GPS (GPX)</button><button class="btn" id="dl-kml">Google Earth (KML)</button><button class="btn" id="dl-lines">Lines and targets (CSV)</button><span class="readout" id="dl-status"></span></div></div>
+  <div class="tblwrap"><table id="tbl-st"></table></div>
+</div>
+
+<div class="panel steps">
+  <div><h3>1 · Reference line R1</h3><p>Measure first over the quiet area: it gives the background resistivity and the noise level that set how deep the other lines can see.</p></div>
+  <div><h3>2 · TEM lines, priority 1</h3><p>Central-loop soundings, square loop of the listed side, ≥ 10 A, gates to ≥ 10 ms; stack until the late gates are stable. Lines may shift up to ~300 m to follow tracks; keep them across strike.</p></div>
+  <div><h3>3 · Deep lines and AMT</h3><p>400 m loops plus tensor AMT (10 Hz–10 kHz, 50 m dipoles, remote reference) on the deep targets, then the regional AMT traverse P1 along A–B.</p></div>
+  <div><h3>Depth caveat</h3><p>Target depths come from a potential-field inversion and are uncertain by a few hundred metres; compact and smooth models fit the data equally well. Saline wadi fill near the coast shortens TEM penetration.</p></div>
+</div>
+
+<footer>Wadi Ghadir EM Survey Planner · written by Mohamed Sobh, LIAG (Leibniz Institute for Applied Geophysics, Hannover, Germany). Targets from the compact joint SimPEG inversion (notebook 08); design by scripts/design_em_survey.py. Relief: Copernicus DEM GLO-30 © DLR/Airbus, ESA. Coordinates: UTM zone 36N, WGS 84.</footer>
+</div>
+
+<script>
+"use strict";
+// Wadi Ghadir EM Survey Planner, written by Mohamed Sobh, LIAG.
+const D = /*__DATA__*/null;
+const $ = (s) => document.querySelector(s);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function bytes(b64) { const s = atob(b64), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+const T = D.terrain, Z200 = new Int16Array(bytes(T.z200).buffer), GR = D.grids;
+const GRAV = new Int16Array(bytes(GR.grav).buffer), RTP = new Int16Array(bytes(GR.rtp).buffer);
+const HILL = new Image(); HILL.src = T.hillshade; HILL.onload = () => drawMap();
+const LINES = D.lines, TARGETS = Object.fromEntries(D.targets.map((t) => [t.id, t]));
+const SECS = {}; for (const [k, s] of Object.entries(D.sections)) SECS[k] = Object.assign({}, s, { rho: new Int8Array(bytes(s.rho).buffer), chi: new Int8Array(bytes(s.chi).buffer) });
+const ST = D.stations, NST = ST.line.length;
+const KCOL = { magnetic: "#7b1fa2", dense: "#c62828", light: "#1565c0" };
+const lineColour = (ln) => (ln.id[0] === "P" ? css("--amt") : ln.id[0] === "R" ? css("--tem") : css("--ink"));
+const S = { layer: "grav", tracks: true, targets: true, st: true, sel: "L1", prop: "rho", lrho: 2.5, loop: "plan", cur: 10, noise: 1e-8, f: 10 };
+
+// ---------------------------------------------------------------- helpers
+function lonlat(e, n) { const u = (e - D.ll.e0) / 1e4, v = (n - D.ll.n0) / 1e4, b = [1, u, v, u * u, u * v, v * v];
+  return [b.reduce((s, x, i) => s + x * D.ll.lon[i], 0), b.reduce((s, x, i) => s + x * D.ll.lat[i], 0)]; }
+function terrainZ(e, n) {
+  const fx = (e - T.x0) / 200, fy = (T.y1 - n) / 200;
+  if (fx < 0 || fy < 0 || fx > T.nx200 - 1 || fy > T.ny200 - 1) return NaN;
+  const i = Math.min(Math.floor(fx), T.nx200 - 2), j = Math.min(Math.floor(fy), T.ny200 - 2), a = fx - i, b = fy - j, z = (r, c) => Z200[r * T.nx200 + c];
+  return Math.max(0, (1 - b) * ((1 - a) * z(j, i) + a * z(j, i + 1)) + b * ((1 - a) * z(j + 1, i) + a * z(j + 1, i + 1)));
+}
+const RDBU = ["#053061", "#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#f7f7f7", "#fddbc7", "#f4a582", "#d6604d", "#b2182b", "#67001f"].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+const MAGMA = ["#fcfdbf", "#fec287", "#fb8761", "#e55964", "#b5367a", "#812581", "#4f127b", "#1c1044", "#000004"].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+function ramp(st, t) { t = Math.max(0, Math.min(1, t)) * (st.length - 1); const i = Math.min(Math.floor(t), st.length - 2), f = t - i; return st[i].map((a, k) => Math.round(a + f * (st[i + 1][k] - a))); }
+function fitCanvas(cv, h) { const dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth || cv.parentElement.clientWidth; cv.style.height = h + "px"; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w }; }
+function niceStep(r, n) { const x = r / n, p = 10 ** Math.floor(Math.log10(x)), f = x / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }
+const temDoi = (L, rho) => Math.min(0.55 * Math.pow(S.cur * L * L * rho / S.noise, 0.2), 1261 * Math.sqrt(rho * D.tem.last_gate));
+const amtDoi = (rho, f) => 356 * Math.sqrt(rho / f);
+const rhoHost = () => 10 ** S.lrho;
+const fmtRho = (r) => (r >= 100 ? Math.round(r / 10) * 10 : r >= 10 ? Math.round(r) : r.toFixed(1)) + " Ωm";
+const loopOf = (ln) => (S.loop === "plan" ? ln.loop_m : Number(S.loop));
+const sel = () => LINES.find((l) => l.id === S.sel);
+
+// ---------------------------------------------------------------- summary strip
+function renderStats() {
+  const nTem = ST.method.filter((m) => m === "TEM").length, nAmt = NST - nTem, km = LINES.reduce((s, l) => s + l.length_m, 0) / 1000;
+  const tpd = Number($("#in-tem")?.value || 25), apd = Number($("#in-amt")?.value || 6), days = Math.ceil(nTem / Math.max(1, tpd)) + Math.ceil(nAmt / Math.max(1, apd));
+  $("#stats").innerHTML = `
+    <div class="stat"><div class="k">Lines</div><div class="v">${LINES.length}</div><div class="s">${LINES.filter((l) => l.priority === "1").length} with priority 1 · ${km.toFixed(1)} line-km</div></div>
+    <div class="stat"><div class="k">TEM soundings</div><div class="v">${nTem}</div><div class="s">central loop, 50–100 m steps</div></div>
+    <div class="stat"><div class="k">AMT soundings</div><div class="v">${nAmt}</div><div class="s">250–500 m steps</div></div>
+    <div class="stat"><div class="k">Targets</div><div class="v">${D.targets.length}</div><div class="s">${D.targets.filter((t) => t.top_depth < 100).length} reach within 100 m of the surface</div></div>
+    <div class="stat"><div class="k">Field days (estimate)</div><div class="v" id="days">${days}</div><div class="s"><label>TEM/day <input id="in-tem" type="number" min="5" max="80" value="${tpd}"></label> <label>AMT/day <input id="in-amt" type="number" min="1" max="20" value="${apd}"></label></div></div>`;
+  $("#in-tem").addEventListener("change", renderStats); $("#in-amt").addEventListener("change", renderStats);
+}
+
+// ---------------------------------------------------------------- map
+const overlays = {};
+function overlay(kind) {
+  if (overlays[kind]) return overlays[kind];
+  const c = document.createElement("canvas"); c.width = GR.nx; c.height = GR.ny; const g = c.getContext("2d"), im = g.createImageData(GR.nx, GR.ny);
+  const arr = kind === "grav" ? GRAV : RTP, sc = kind === "grav" ? 100 * GR.grav_lim : GR.rtp_lim;
+  for (let i = 0; i < arr.length; i++) { if (arr[i] === -32768) continue; const c3 = ramp(RDBU, (arr[i] / sc + 1) / 2); im.data.set([c3[0], c3[1], c3[2], 205], 4 * i); }
+  g.putImageData(im, 0, 0); return (overlays[kind] = c);
+}
+let TF = null;
+function drawMap() {
+  const cv = $("#cv-map"), w = cv.clientWidth || cv.parentElement.clientWidth, ml = 50, mr = 10, mt = 6, mb = 38, pw = w - ml - mr, ph = pw * (T.y1 - T.y0) / (T.x1 - T.x0);
+  const { g } = fitCanvas(cv, ph + mt + mb);
+  TF = { ml, mt, pw, ph, x: (e) => ml + (e - T.x0) / (T.x1 - T.x0) * pw, y: (n) => mt + (T.y1 - n) / (T.y1 - T.y0) * ph, e: (px) => T.x0 + (px - ml) / pw * (T.x1 - T.x0), n: (py) => T.y1 - (py - mt) / ph * (T.y1 - T.y0) };
+  g.fillStyle = css("--soft"); g.fillRect(ml, mt, pw, ph);
+  if (HILL.complete && HILL.naturalWidth) g.drawImage(HILL, ml, mt, pw, ph);
+  if (S.layer !== "relief") { g.imageSmoothingEnabled = true; g.drawImage(overlay(S.layer), ml, mt, pw, ph); }
+  if (S.tracks) { g.fillStyle = "rgba(30,30,30,.55)"; for (const p of D.tracks.gravity) { g.fillRect(TF.x(p[0]) - 0.8, TF.y(p[1]) - 0.8, 1.6, 1.6); } }
+  if (S.targets) for (const t of D.targets) {
+    g.beginPath(); t.hull.forEach((p, i) => (i ? g.lineTo(TF.x(p[0]), TF.y(p[1])) : g.moveTo(TF.x(p[0]), TF.y(p[1])))); g.closePath();
+    g.fillStyle = KCOL[t.kind] + "22"; g.fill(); g.setLineDash([5, 3]); g.lineWidth = 1.6; g.strokeStyle = KCOL[t.kind]; g.stroke(); g.setLineDash([]);
+    g.font = "600 11px " + css("--mono"); g.fillStyle = KCOL[t.kind]; g.textAlign = "center"; g.textBaseline = "middle";
+    const hx = Math.max(...t.hull.map((p) => p[0])), hy = Math.max(...t.hull.map((p) => p[1])); g.fillText(t.id, TF.x(hx) + 10, TF.y(hy) - 6);
+  }
+  for (const ln of LINES) {
+    const on = ln.id === S.sel, c = lineColour(ln);
+    g.lineCap = "round"; g.strokeStyle = "#fff"; g.lineWidth = on ? 8 : 5; g.beginPath(); g.moveTo(TF.x(ln.a[0]), TF.y(ln.a[1])); g.lineTo(TF.x(ln.b[0]), TF.y(ln.b[1])); g.stroke();
+    g.strokeStyle = on ? css("--accent") : c; g.lineWidth = on ? 4.5 : 2.5; g.stroke();
+    if (S.st) for (let i = 0; i < NST; i++) if (ST.line[i] === ln.id) { g.fillStyle = ST.method[i] === "AMT" ? css("--amt") : css("--tem"); const x = TF.x(ST.easting[i]), y = TF.y(ST.northing[i]);
+      if (ST.method[i] === "AMT") { g.beginPath(); g.moveTo(x, y - 3.5); g.lineTo(x + 3.5, y); g.lineTo(x, y + 3.5); g.lineTo(x - 3.5, y); g.fill(); } else { g.beginPath(); g.arc(x, y, on ? 2.4 : 1.7, 0, 7); g.fill(); } }
+    g.font = "700 12px " + css("--mono"); g.textAlign = "left"; g.textBaseline = "bottom"; g.lineWidth = 3; g.strokeStyle = "#fff";
+    g.strokeText(ln.id, TF.x(ln.b[0]) + 5, TF.y(ln.b[1]) - 3); g.fillStyle = on ? css("--accent") : c; g.fillText(ln.id, TF.x(ln.b[0]) + 5, TF.y(ln.b[1]) - 3);
+  }
+  // axes
+  const mu = css("--muted"); g.fillStyle = mu; g.strokeStyle = mu; g.font = "11px " + css("--mono"); g.textAlign = "center"; g.textBaseline = "top";
+  for (let e = Math.ceil(T.x0 / 5000) * 5000; e <= T.x1; e += 5000) { g.beginPath(); g.moveTo(TF.x(e), mt + ph); g.lineTo(TF.x(e), mt + ph + 4); g.stroke(); g.fillText((e / 1000).toFixed(0), TF.x(e), mt + ph + 6); }
+  g.fillText("easting [km], UTM 36N", ml + pw / 2, mt + ph + 21); g.textAlign = "right"; g.textBaseline = "middle";
+  for (let n = Math.ceil(T.y0 / 5000) * 5000; n <= T.y1; n += 5000) { g.beginPath(); g.moveTo(ml - 4, TF.y(n)); g.lineTo(ml, TF.y(n)); g.stroke(); g.fillText((n / 1000).toFixed(0), ml - 6, TF.y(n)); }
+  g.strokeStyle = css("--line"); g.strokeRect(ml + 0.5, mt + 0.5, pw, ph);
+  const lim = S.layer === "grav" ? `±${GR.grav_lim.toFixed(1)} mGal` : S.layer === "rtp" ? `±${Math.round(GR.rtp_lim)} nT` : "";
+  $("#legend-map").innerHTML = `<span class="chip tem">● TEM station</span><span class="chip amt">◆ AMT station</span>` +
+    Object.entries(KCOL).map(([k, c]) => `<span class="chip" style="color:${c};border-color:${c}">${k} body</span>`).join("") +
+    (lim ? `<span class="sub">colours: blue − / red + , ${lim}</span>` : "");
+}
+function segDist(px, py, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(px - ax - t * dx, py - ay - t * dy); }
+function inPoly(x, y, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
+$("#cv-map").addEventListener("click", (ev) => {
+  if (!TF) return; const r = ev.currentTarget.getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top;
+  let best = null, bd = 14; for (const ln of LINES) { const d = segDist(px, py, TF.x(ln.a[0]), TF.y(ln.a[1]), TF.x(ln.b[0]), TF.y(ln.b[1])); if (d < bd) { bd = d; best = ln; } }
+  if (!best) for (const t of D.targets) if (inPoly(TF.e(px), TF.n(py), t.hull)) best = LINES.find((l) => l.target === t.id);
+  if (best) select(best.id);
+});
+$("#cv-map").addEventListener("pointermove", (ev) => {
+  if (!TF) return; const r = ev.currentTarget.getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top, e = TF.e(px), n = TF.n(py), ro = $("#ro-map");
+  if (px < TF.ml || px > TF.ml + TF.pw || py < TF.mt || py > TF.mt + TF.ph) { ro.textContent = "Click a line to select it. Point at a station or a target for details."; return; }
+  let bi = -1, bd = 7; if (S.st) for (let i = 0; i < NST; i++) { const d = Math.hypot(TF.x(ST.easting[i]) - px, TF.y(ST.northing[i]) - py); if (d < bd) { bd = d; bi = i; } }
+  const [lo, la] = lonlat(e, n), gi = Math.floor((e - T.x0) / 100), gj = Math.floor((T.y1 - n) / 100);
+  let val = ""; if (S.layer !== "relief" && gi >= 0 && gj >= 0 && gi < GR.nx && gj < GR.ny) { const v = (S.layer === "grav" ? GRAV : RTP)[gj * GR.nx + gi]; if (v !== -32768) val = S.layer === "grav" ? ` · ${(v / 100).toFixed(2)} mGal` : ` · ${v} nT`; }
+  if (bi >= 0) { ro.textContent = `${ST.station[bi]} · ${ST.method[bi]}${ST.loop_m[bi] ? " " + ST.loop_m[bi] + " m loop" : ""} · ${ST.lat[bi].toFixed(6)}° N, ${ST.lon[bi].toFixed(6)}° E · ${Math.round(ST.nearest_traverse_m[bi])} m from the nearest survey track`; return; }
+  const t = S.targets && D.targets.find((t) => inPoly(e, n, t.hull));
+  ro.textContent = `${la.toFixed(5)}° N, ${lo.toFixed(5)}° E · elevation ${Math.round(terrainZ(e, n))} m${val}` + (t ? ` · ${t.id}: ${t.kind} body, top ≈ ${t.top_depth < 100 ? "< 100" : Math.round(t.top_depth)} m below surface` : "");
+});
+
+// ---------------------------------------------------------------- line card
+const KIND_TEXT = {
+  magnetic: "Magnetic body: magnetite-bearing serpentinite or mafic rock (moderate resistivity), or pyrrhotite/sulphides (conductive). EM tells these apart.",
+  dense: "Dense body: mafic or metavolcanic rock. Look for conductive shear zones and alteration along its contacts.",
+  light: "Low-density body: granite, altered rock or sediments; near the coast possibly saline sediments and groundwater (conductive).",
+};
+function renderCard() {
+  const ln = sel(), t = TARGETS[ln.target], L = loopOf(ln), r = rhoHost(), [lo1, la1] = lonlat(...ln.a), [lo2, la2] = lonlat(...ln.b);
+  let h = `<div class="phead"><h3>${ln.id}</h3><div class="chips"><span class="chip ${ln.priority === "1" ? "p1" : ""}">priority ${ln.priority}</span>${ln.n_tem ? '<span class="chip tem">TEM</span>' : ""}${ln.n_amt ? '<span class="chip amt">AMT</span>' : ""}</div></div>
+    <p class="note" style="color:var(--ink)">${ln.purpose.replace(/^./, (c) => c.toUpperCase())}.</p>
+    <dl class="kv"><dt>Length</dt><dd>${(ln.length_m / 1000).toFixed(2)} km</dd>
+    ${ln.n_tem ? `<dt>TEM</dt><dd>${ln.n_tem} soundings · ${ln.loop_m} m loop · every ${ln.spacing_m} m</dd>` : ""}
+    ${ln.n_amt ? `<dt>AMT</dt><dd>${ln.n_amt} soundings · every ${ln.amt_spacing_m} m</dd>` : ""}
+    <dt>Start (west)</dt><dd>${la1.toFixed(5)}° N, ${lo1.toFixed(5)}° E</dd><dt>End</dt><dd>${la2.toFixed(5)}° N, ${lo2.toFixed(5)}° E</dd>`;
+  if (L) h += `<dt>TEM sees to</dt><dd>~${Math.round(temDoi(L, r))} m at ${fmtRho(r)}</dd>`;
+  if (ln.n_amt) h += `<dt>AMT sees to</dt><dd>~${Math.round(amtDoi(r, S.f))} m at ${fmtRho(r)}</dd>`;
+  h += "</dl>";
+  if (t) h += `<div class="phead" style="margin-top:4px"><h2 style="color:${KCOL[t.kind]}">Target ${t.id} · ${t.kind}</h2></div>
+    <dl class="kv"><dt>Depth to top</dt><dd>${t.top_depth < 100 ? "< 100 m (near surface)" : "≈ " + Math.round(t.top_depth) + " m"}</dd><dt>Depth to centre</dt><dd>≈ ${Math.round(t.centre_depth)} m</dd>
+    <dt>Base</dt><dd>${t.bottom_elev > -2300 ? Math.round(t.bottom_elev) + " m elevation" : "below −2.4 km (not resolved)"}</dd>
+    <dt>Peak contrast</dt><dd>${t.kind === "magnetic" ? "χ " + t.peak.toFixed(2) + " SI" : "Δρ " + (t.peak > 0 ? "+" : "") + t.peak.toFixed(2) + " g/cm³"}</dd>
+    <dt>Volume</dt><dd>${t.volume_km3.toFixed(2)} km³</dd><dt>Dense and magnetic</dt><dd>${Math.round(t.dense_magnetic_share * 100)} % of its cells</dd></dl>
+    <p class="note">${KIND_TEXT[t.kind]}</p>`;
+  h += `<div class="lines">${LINES.map((l) => `<button data-id="${l.id}" aria-pressed="${l.id === S.sel}"><span class="dot" style="background:${l.target in TARGETS ? KCOL[TARGETS[l.target].kind] : lineColour(l)}"></span>${l.id}</button>`).join("")}</div>`;
+  $("#card").innerHTML = h;
+  $("#card").querySelectorAll(".lines button").forEach((b) => b.addEventListener("click", () => select(b.dataset.id)));
+}
+
+// ---------------------------------------------------------------- section
+let SX = null;
+function drawSection() {
+  const ln = sel(), s = SECS[ln.id], cv = $("#cv-sec"), w = cv.clientWidth || cv.parentElement.clientWidth, ml = 54, mr = 12, mt = 22, mb = 40, pw = w - ml - mr;
+  const ph = Math.max(200, Math.min(340, pw * 0.3)), { g } = fitCanvas(cv, ph + mt + mb), L = ln.length_m, ZT = 900, ZB = -2500;
+  const sx = (d) => ml + d / L * pw, sz = (z) => mt + (ZT - z) / (ZT - ZB) * ph;
+  SX = { ml, mt, pw, ph, L, ZT, ZB, d: (px) => (px - ml) / pw * L, z: (py) => ZT - (py - mt) / ph * (ZT - ZB) };
+  g.fillStyle = css("--soft"); g.fillRect(ml, mt, pw, ph);
+  const arr = S.prop === "rho" ? s.rho : s.chi, nz = s.zb.length;
+  for (let k = 0; k < nz; k++) for (let i = 0; i < s.n; i++) {
+    const q = arr[k * s.n + i]; if (q === -128) continue;
+    const c = S.prop === "rho" ? ramp(RDBU, (q / 127 + 1) / 2) : ramp(MAGMA, q / 127); g.fillStyle = `rgb(${c})`;
+    const x0 = Math.floor(sx(Math.max(0, (i - 0.5) * s.step))), x1 = Math.ceil(sx(Math.min(L, (i + 0.5) * s.step))), y0 = Math.floor(sz(Math.min(s.zt[k], ZT))), y1 = Math.ceil(sz(Math.max(s.zb[k], ZB)));
+    g.fillRect(x0, y0, x1 - x0, y1 - y0);
+  }
+  const N = 160, surf = []; for (let i = 0; i <= N; i++) { const t = i / N; surf.push(terrainZ(ln.a[0] + t * (ln.b[0] - ln.a[0]), ln.a[1] + t * (ln.b[1] - ln.a[1]))); }
+  const path = (f, col, dash, lw) => { g.strokeStyle = col; g.setLineDash(dash); g.lineWidth = lw; g.beginPath(); surf.forEach((z, i) => { const x = sx(i / N * L), y = sz(Math.max(ZB, f(z))); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.setLineDash([]); };
+  g.fillStyle = css("--panel"); g.beginPath(); g.moveTo(sx(0), mt); surf.forEach((z, i) => g.lineTo(sx(i / N * L), sz(z))); g.lineTo(sx(L), mt); g.closePath(); g.fill();
+  path((z) => z, css("--ink"), [], 1.5);
+  const r = rhoHost(), Lp = loopOf(ln), labels = [];
+  if (Lp && ln.n_tem) { const dz = temDoi(Lp, r); path((z) => z - dz, css("--tem"), [7, 4], 2); labels.push([css("--tem"), `TEM ${Lp} m loop: ~${Math.round(dz)} m${Math.min(...surf) - dz < ZB ? " (below this section)" : ""}`]); }
+  if (ln.n_amt) { const dz = amtDoi(r, S.f); path((z) => z - dz, css("--amt"), [2, 3], 2.2); labels.push([css("--amt"), `AMT ≥ ${S.f} Hz: ~${Math.round(dz)} m${Math.min(...surf) - dz < ZB ? " (below this section)" : ""}`]); }
+  // stations along the top
+  for (let i = 0; i < NST; i++) if (ST.line[i] === ln.id) { const x = sx(ST.distance_m[i]), z = terrainZ(ST.easting[i], ST.northing[i]), y = sz(z) - 4;
+    g.fillStyle = ST.method[i] === "AMT" ? css("--amt") : css("--tem"); g.beginPath();
+    if (ST.method[i] === "AMT") { g.moveTo(x, y - 9); g.lineTo(x + 3.5, y - 5); g.lineTo(x, y - 1); g.lineTo(x - 3.5, y - 5); } else { g.moveTo(x, y); g.lineTo(x - 3, y - 6); g.lineTo(x + 3, y - 6); }
+    g.fill(); }
+  const t = TARGETS[ln.target];
+  if (t) { const mid = L / 2, zs = terrainZ(t.e, t.n) || surf[N >> 1], zt = zs - t.top_depth, zc = zs - t.centre_depth;
+    g.strokeStyle = KCOL[t.kind]; g.fillStyle = KCOL[t.kind]; g.lineWidth = 2; g.beginPath(); g.moveTo(sx(mid), sz(zt)); g.lineTo(sx(mid), sz(zc)); g.stroke();
+    g.beginPath(); g.arc(sx(mid), sz(zt), 4.5, 0, 7); g.fill(); g.beginPath(); g.arc(sx(mid), sz(zc), 3, 0, 7); g.fill();
+    g.font = "600 12px " + css("--body"); g.textAlign = "left"; g.textBaseline = "middle"; g.lineWidth = 3; g.strokeStyle = css("--panel");
+    const tx = `${t.id} top ≈ ${t.top_depth < 100 ? "< 100" : Math.round(t.top_depth)} m · centre ≈ ${Math.round(t.centre_depth)} m`;
+    g.strokeText(tx, sx(mid) + 9, sz(zt) + 12); g.fillText(tx, sx(mid) + 9, sz(zt) + 12);
+    const reach = Math.max(Lp && ln.n_tem ? temDoi(Lp, r) : 0, ln.n_amt ? amtDoi(r, S.f) : 0);
+    $("#sec-verdict").innerHTML = reach >= t.centre_depth ? `<b style="color:var(--tem)">Reaches the target.</b> At ${fmtRho(r)} this set-up sees to ~${Math.round(reach)} m, below the centre of ${t.id} (~${Math.round(t.centre_depth)} m).`
+      : reach >= t.top_depth ? `<b style="color:var(--warn)">Reaches the top only.</b> ~${Math.round(reach)} m covers the top of ${t.id} but not its centre (~${Math.round(t.centre_depth)} m); use a larger loop, more current or AMT.`
+        : `<b style="color:var(--warn)">Too shallow.</b> ~${Math.round(reach)} m does not reach the top of ${t.id} (~${Math.round(t.top_depth)} m); use a larger loop or AMT.`;
+  } else $("#sec-verdict").textContent = ln.id === "R1" ? "Reference line: the soundings here fix the background resistivity used for the depths on all other lines." : "Regional AMT traverse: maps the structure of the central belt to 1–3 km depth.";
+  // axes and labels
+  const mu = css("--muted"); g.fillStyle = mu; g.strokeStyle = mu; g.font = "11px " + css("--mono"); g.textAlign = "center"; g.textBaseline = "top";
+  const st = niceStep(L, Math.max(3, Math.min(10, pw / 80))); for (let d = 0; d <= L + 1; d += st) { g.beginPath(); g.moveTo(sx(d), mt + ph); g.lineTo(sx(d), mt + ph + 4); g.stroke(); g.fillText((d / 1000).toFixed(st < 1000 ? 1 : 0), sx(d), mt + ph + 6); }
+  g.fillText("distance from the west end [km]", ml + pw / 2, mt + ph + 21); g.textAlign = "right"; g.textBaseline = "middle";
+  for (let z = -2500; z <= 500; z += 500) { g.beginPath(); g.moveTo(ml - 4, sz(z)); g.lineTo(ml, sz(z)); g.stroke(); g.fillText((z / 1000).toFixed(1), ml - 6, sz(z)); }
+  g.save(); g.translate(11, mt + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText("elevation [km]", 0, 0); g.restore();
+  g.textAlign = "left"; g.textBaseline = "bottom"; let lx = ml; g.font = "600 11.5px " + css("--mono");
+  for (const [c, tx] of labels) { g.fillStyle = c; g.fillText("— " + tx, lx, mt - 5); lx += g.measureText("— " + tx).width + 18; }
+  g.fillStyle = mu; g.textAlign = "right"; g.font = "11px " + css("--mono"); g.fillText(`host ${fmtRho(r)} · colour: ${S.prop === "rho" ? "Δρ ±0.3 g/cm³" : "χ 0–0.3 SI"}`, ml + pw, mt - 5);
+  g.strokeStyle = css("--line"); g.strokeRect(ml + 0.5, mt + 0.5, pw, ph);
+  $("#sec-name").textContent = `${ln.id} · ${(L / 1000).toFixed(1)} km · joint compact model`;
+}
+$("#cv-sec").addEventListener("pointermove", (ev) => {
+  if (!SX) return; const r = ev.currentTarget.getBoundingClientRect(), d = SX.d(ev.clientX - r.left), z = SX.z(ev.clientY - r.top), ln = sel(), s = SECS[ln.id];
+  if (d < 0 || d > SX.L || z < SX.ZB || z > SX.ZT) { $("#ro-sec").textContent = "Point at the section to read the model."; return; }
+  const i = Math.min(s.n - 1, Math.round(d / s.step)), k = s.zb.findIndex((zb, kk) => z >= zb && z < s.zt[kk]), t = d / SX.L, e = ln.a[0] + t * (ln.b[0] - ln.a[0]), n = ln.a[1] + t * (ln.b[1] - ln.a[1]), zs = terrainZ(e, n);
+  let v = "air"; if (k >= 0) { const qr = s.rho[k * s.n + i], qc = s.chi[k * s.n + i]; if (qr !== -128) v = `Δρ ${(qr / 127 * 0.3 >= 0 ? "+" : "")}${(qr / 127 * 0.3).toFixed(3)} g/cm³ · χ ${(qc / 127 * 0.3).toFixed(4)} SI`; }
+  $("#ro-sec").textContent = `${(d / 1000).toFixed(2)} km · ${Math.round(z)} m elevation (${Math.max(0, Math.round(zs - z))} m below surface) · ${v}`;
+});
+
+// ---------------------------------------------------------------- charts
+function axes(g, ml, mt, pw, ph, xt, yt, xl, yl) {
+  const mu = css("--muted"); g.strokeStyle = css("--line"); g.fillStyle = mu; g.font = "11px " + css("--mono"); g.lineWidth = 1;
+  xt.forEach(([x, t]) => { g.beginPath(); g.moveTo(x, mt); g.lineTo(x, mt + ph); g.stroke(); g.textAlign = "center"; g.textBaseline = "top"; g.fillText(t, x, mt + ph + 5); });
+  yt.forEach(([y, t]) => { g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke(); g.textAlign = "right"; g.textBaseline = "middle"; g.fillText(t, ml - 6, y); });
+  g.textAlign = "center"; g.textBaseline = "top"; g.fillText(xl, ml + pw / 2, mt + ph + 20);
+  if (yl) { g.save(); g.translate(11, mt + ph / 2); g.rotate(-Math.PI / 2); g.textBaseline = "middle"; g.fillText(yl, 0, 0); g.restore(); }
+  g.strokeStyle = mu; g.strokeRect(ml + 0.5, mt + 0.5, pw, ph);
+}
+const pow10 = (e) => (e >= 4 ? "10⁴" : e === 3 ? "1000" : e === 2 ? "100" : e === 1 ? "10" : e === 0 ? "1" : "10" + e);
+function drawDoi() {
+  const cv = $("#cv-doi"), w = cv.clientWidth, H = Math.max(260, Math.min(360, w * 0.62)), { g } = fitCanvas(cv, H), ml = 58, mr = 12, mt = 10, mb = 42, pw = w - ml - mr, ph = H - mt - mb;
+  const X = (r) => ml + Math.log10(r) / 4 * pw, Y = (d) => mt + ph - (Math.log10(d) - 1) / 3 * ph;
+  axes(g, ml, mt, pw, ph, [0, 1, 2, 3, 4].map((e) => [X(10 ** e), pow10(e)]), [1, 2, 3, 4].map((e) => [Y(10 ** e), e === 4 ? "10 km" : e === 3 ? "1 km" : e === 2 ? "100 m" : "10 m"]), "host resistivity [Ωm]", "depth of investigation");
+  for (const t of D.targets) { const y = Y(Math.max(15, t.centre_depth)); g.strokeStyle = KCOL[t.kind] + "88"; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke(); g.setLineDash([]);
+    g.fillStyle = KCOL[t.kind]; g.font = "10.5px " + css("--mono"); g.textAlign = "right"; g.textBaseline = "bottom"; g.fillText(t.id + " centre", ml + pw - 3, y - 1); }
+  const curves = [[50, "#a5d6a7"], [100, "#66bb6a"], [200, "#2e7d32"], [400, "#1b5e20"]].map(([L, c]) => [c, `TEM ${L} m`, (r) => temDoi(L, r), []]).concat([[css("--amt"), `AMT ${S.f} Hz`, (r) => amtDoi(r, S.f), [6, 4]]]);
+  let ly = mt + 8;
+  for (const [c, lab, f, dash] of curves) { g.strokeStyle = c; g.lineWidth = 2.2; g.setLineDash(dash); g.beginPath(); for (let i = 0; i <= 80; i++) { const r = 10 ** (i / 20), d = f(r); const y = Y(Math.max(10, Math.min(1e4, d))); i ? g.lineTo(X(r), y) : g.moveTo(X(r), y); } g.stroke(); g.setLineDash([]);
+    g.fillStyle = c; g.fillRect(ml + 8, ly - 1.5, 14, 3); g.fillStyle = css("--ink"); g.font = "12px " + css("--body"); g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(lab, ml + 26, ly); ly += 16; }
+  const xr = X(rhoHost()); g.strokeStyle = css("--accent"); g.lineWidth = 1.5; g.beginPath(); g.moveTo(xr, mt); g.lineTo(xr, mt + ph); g.stroke();
+  g.fillStyle = css("--accent"); g.textAlign = "left"; g.textBaseline = "top"; g.font = "600 11px " + css("--mono"); g.fillText(fmtRho(rhoHost()), Math.min(xr + 4, ml + pw - 70), mt + ph - 16);
+}
+function drawRes() {
+  const cv = $("#cv-res"), w = cv.clientWidth, names = Object.keys(D.resistivities), H = 34 + names.length * 30 + 30, { g } = fitCanvas(cv, H);
+  const ml = Math.min(250, w * 0.45), mr = 12, mt = 8, pw = w - ml - mr, ph = names.length * 30, X = (r) => ml + (Math.log10(r) + 2) / 6.5 * pw;
+  axes(g, ml, mt, pw, ph, [-2, 0, 2, 4].map((e) => [X(10 ** e), e === -2 ? "0.01" : pow10(e)]), [], "resistivity [Ωm]", "");
+  names.forEach((nm, i) => { const [lo, hi] = D.resistivities[nm], y = mt + i * 30 + 15, cond = /sulph|graph/i.test(nm);
+    g.fillStyle = cond ? "#c62828" : css("--muted"); g.globalAlpha = 0.85; g.fillRect(X(lo), y - 7, X(hi) - X(lo), 14); g.globalAlpha = 1;
+    g.fillStyle = css("--ink"); g.font = "12.5px " + css("--body"); g.textAlign = "right"; g.textBaseline = "middle"; g.fillText(nm, ml - 8, y); });
+  const xr = X(rhoHost()); g.strokeStyle = css("--accent"); g.lineWidth = 1.5; g.beginPath(); g.moveTo(xr, mt); g.lineTo(xr, mt + ph); g.stroke();
+}
+
+// ---------------------------------------------------------------- stations table and downloads
+function renderTable() {
+  const ln = sel(), rows = []; for (let i = 0; i < NST; i++) if (ST.line[i] === ln.id) rows.push(i);
+  $("#st-name").textContent = `${ln.id} · ${rows.length} stations`;
+  $("#tbl-st").innerHTML = "<thead><tr><th>Station</th><th>Method</th><th>Loop</th><th>Distance</th><th>Latitude</th><th>Longitude</th><th>Easting</th><th>Northing</th><th>To track</th></tr></thead><tbody>" +
+    rows.map((i) => `<tr><td>${ST.station[i]}</td><td>${ST.method[i]}</td><td>${ST.loop_m[i] ? ST.loop_m[i] + " m" : "—"}</td><td>${Math.round(ST.distance_m[i])} m</td><td>${ST.lat[i].toFixed(6)}</td><td>${ST.lon[i].toFixed(6)}</td><td>${ST.easting[i].toFixed(0)}</td><td>${ST.northing[i].toFixed(0)}</td><td>${Math.round(ST.nearest_traverse_m[i])} m</td></tr>`).join("") + "</tbody>";
+}
+let DL = null;
+(async () => { try { DL = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { DL = null; } })();
+async function saveFile(name, text, mime) {
+  const st = $("#dl-status"), blob = new Blob([text], { type: mime });
+  if (DL) { try { await DL.save({ filename: name, data: blob }); st.textContent = "Saved " + name; } catch (e) { st.textContent = e && e.code === "declined" ? "Download cancelled." : "Download failed: " + ((e && (e.message || e.code)) || "unknown error"); } return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  st.textContent = "Saving " + name + " (if nothing happens, use the downloaded copy of this page)";
+}
+$("#dl-csv").addEventListener("click", () => saveFile("em_stations.csv", D.files["em_stations.csv"], "text/csv"));
+$("#dl-gpx").addEventListener("click", () => saveFile("em_survey.gpx", D.files["em_survey.gpx"], "application/gpx+xml"));
+$("#dl-kml").addEventListener("click", () => saveFile("em_survey.kml", D.files["em_survey.kml"], "application/vnd.google-earth.kml+xml"));
+$("#dl-lines").addEventListener("click", () => saveFile("em_lines_and_targets.csv", D.files["em_lines.csv"] + "\n" + D.files["em_targets.csv"], "text/csv"));
+
+// ---------------------------------------------------------------- wiring
+function seg(id, key, after) { const el = $(id); el.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S[key] = b.dataset.v; el.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); after(); }); }
+seg("#seg-layer", "layer", drawMap); seg("#seg-prop", "prop", drawSection);
+$("#chk-tracks").addEventListener("change", (e) => { S.tracks = e.target.checked; drawMap(); });
+$("#chk-targets").addEventListener("change", (e) => { S.targets = e.target.checked; drawMap(); });
+$("#chk-st").addEventListener("change", (e) => { S.st = e.target.checked; drawMap(); });
+function doiChanged() { $("#lab-rho").textContent = fmtRho(rhoHost()); renderCard(); drawSection(); drawDoi(); drawRes(); }
+$("#rng-rho").addEventListener("input", (e) => { S.lrho = Number(e.target.value); doiChanged(); });
+$("#sel-loop").addEventListener("change", (e) => { S.loop = e.target.value; doiChanged(); });
+$("#sel-cur").addEventListener("change", (e) => { S.cur = Number(e.target.value); doiChanged(); });
+$("#sel-noise").addEventListener("change", (e) => { S.noise = Number(e.target.value); doiChanged(); });
+$("#sel-f").addEventListener("change", (e) => { S.f = Number(e.target.value); doiChanged(); });
+function select(id) { S.sel = id; try { localStorage.setItem("wgem-line", id); } catch (e) { /* storage unavailable */ } drawMap(); renderCard(); drawSection(); renderTable(); }
+function redraw() { drawMap(); drawSection(); drawDoi(); drawRes(); }
+let rt = 0; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(redraw, 60); }).observe(document.querySelector(".wrap"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", redraw);
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+try { const s = localStorage.getItem("wgem-line"); if (s && LINES.some((l) => l.id === s)) S.sel = s; } catch (e) { /* storage unavailable */ }
+renderStats(); $("#lab-rho").textContent = fmtRho(rhoHost()); select(S.sel); drawDoi(); drawRes();
+</script>

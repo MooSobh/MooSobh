@@ -323,12 +323,8 @@ def draw_sections(fig, lines, targets, mesh, rho, chi):
     fig.colorbar(im, ax=list(axes), shrink=0.35, pad=0.01, label="Δρ [g/cm³]")
 
 
-def main():
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_pdf import PdfPages
-    os.makedirs(OUT, exist_ok=True)
+def compute():
+    """Targets, lines and stations of the EM survey (used by the plan sheets and the interactive page)."""
     mesh, act, rho, chi, g, m = load()
     targets, far, surf = find_targets(mesh, act, rho, chi, g, m)
     ref = quiet_site(mesh, act, rho, chi, far, targets)
@@ -342,6 +338,16 @@ def main():
     for k, ln in enumerate(lines):
         ln["n_tem"] = int((st.line == ln["id"]).sum() - ((st.line == ln["id"]) & (st.method == "AMT")).sum())
         ln["n_amt"] = int(((st.line == ln["id"]) & (st.method == "AMT")).sum())
+    return mesh, act, rho, chi, g, m, targets, lines, st
+
+
+def main():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    os.makedirs(OUT, exist_ok=True)
+    mesh, act, rho, chi, g, m, targets, lines, st = compute()
 
     # tables
     tdf = pd.DataFrame([{k: v for k, v in t.items() if k not in ("footprint", "strike", "score", "width")} for t in targets])

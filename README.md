@@ -88,6 +88,9 @@ with `python scripts/build_inversion_explorer.py` after running the notebooks.
 station spacings chosen from the depth to their tops, adds a regional AMT traverse along A–B and a reference line, and
 writes `outputs/em_survey/`: the plan sheets `EM_Survey_Plan.pdf` (summary, plan maps, sections with expected depths and
 depths of investigation, expected resistivities), the station list (CSV) and `em_survey.gpx` / `.kml` for field GPS.
+`python scripts/build_em_plan_html.py` then builds `web/Wadi_Ghadir_EM_Survey_Planner.html`, the same plan as an
+interactive page: map layers, line and target cards, sections whose depth of investigation follows the host
+resistivity, loop, current and noise chosen on the page, a field-days estimate and the field files to download.
 
 **From the command line:**
 
