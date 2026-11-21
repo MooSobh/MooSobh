@@ -83,6 +83,8 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 #tbl-h2 td, #tbl-h2 th, #tbl-h2t td { text-align: left; font-family: var(--body); vertical-align: top; }
 #tbl-h2 td:first-child, #tbl-h2t td:first-child { font-weight: 600; white-space: nowrap; }
+button.sched { font: 500 12.5px var(--mono); background: var(--panel); color: var(--ink); border: 1.5px solid var(--line); border-radius: 6px; padding: 3px 7px; margin: 2px 0; cursor: pointer; }
+#tbl-sched { min-width: 760px; }
 </style>
 
 <div class="wrap">
@@ -93,7 +95,12 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
   <div class="byline"><b>Written by Mohamed Sobh, LIAG</b> · Leibniz Institute for Applied Geophysics, Hannover</div>
 </header>
 
+<div class="panel" style="gap:8px">
+  <div class="phead"><h2>Survey plan</h2><div class="seg" id="seg-mode"><button data-v="week" aria-pressed="true">One-week campaign</button><button data-v="full" aria-pressed="false">Full plan</button></div></div>
+  <p class="note" id="mode-note"></p>
+</div>
 <div class="stats" id="stats"></div>
+<div class="panel" id="sched-panel"><div class="phead"><h2>Day-by-day schedule</h2><span class="sub" id="sched-sub"></span></div><div class="tblwrap" style="max-height:none"><table id="tbl-sched"></table></div></div>
 
 <div class="grid2">
   <div class="panel">
@@ -159,7 +166,7 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
 
 <div class="panel">
   <div class="phead"><h2>Stations <span class="sub" id="st-name"></span></h2>
-    <div class="dl"><button class="btn" id="dl-csv">Stations (CSV)</button><button class="btn" id="dl-gpx">Field GPS (GPX)</button><button class="btn" id="dl-kml">Google Earth (KML)</button><button class="btn" id="dl-lines">Lines and targets (CSV)</button><span class="readout" id="dl-status"></span></div></div>
+    <div class="dl"><button class="btn" id="dl-csv">Stations (CSV)</button><button class="btn" id="dl-gpx">Field GPS (GPX)</button><button class="btn" id="dl-kml">Google Earth (KML)</button><button class="btn" id="dl-lines">Lines and schedule (CSV)</button><span class="readout" id="dl-status"></span></div></div>
   <div class="tblwrap"><table id="tbl-st"></table></div>
 </div>
 
@@ -183,14 +190,17 @@ function bytes(b64) { const s = atob(b64), a = new Uint8Array(s.length); for (le
 const T = D.terrain, Z200 = new Int16Array(bytes(T.z200).buffer), GR = D.grids;
 const GRAV = new Int16Array(bytes(GR.grav).buffer), RTP = new Int16Array(bytes(GR.rtp).buffer);
 const HILL = new Image(); HILL.src = T.hillshade; HILL.onload = () => drawMap();
-const LINES = D.lines, TARGETS = Object.fromEntries(D.targets.map((t) => [t.id, t]));
-const SECS = {}; for (const [k, s] of Object.entries(D.sections)) SECS[k] = Object.assign({}, s, { rho: new Int8Array(bytes(s.rho).buffer), chi: new Int8Array(bytes(s.chi).buffer) });
-const ST = D.stations, NST = ST.line.length;
+const TARGETS = Object.fromEntries(D.targets.map((t) => [t.id, t]));
+const decodeSecs = (o) => Object.fromEntries(Object.entries(o).map(([k, s]) => [k, Object.assign({}, s, { rho: new Int8Array(bytes(s.rho).buffer), chi: new Int8Array(bytes(s.chi).buffer) })]));
+const PLANS = { week: { lines: D.week.lines, st: D.week.stations, secs: decodeSecs(D.week.sections) }, full: { lines: D.lines, st: D.stations, secs: decodeSecs(D.sections) } };
+let MODE = "week", LINES, ST, NST, SECS;
+function setPlan(m) { MODE = m; LINES = PLANS[m].lines; ST = PLANS[m].st; SECS = PLANS[m].secs; NST = ST.line.length; }
+setPlan("week");
 const KCOL = { magnetic: "#7b1fa2", dense: "#c62828", light: "#1565c0" };
 const lineColour = (ln) => (ln.method === "AMT" ? css("--amt") : ln.method.includes("AMT") ? "#8e44ad" : css("--tem"));
 function labelLine(g, ln, on, c, placed) {
   // id · priority · length in a halo box; tries both ends and four sides, keeps clear of labels already placed
-  const tx = `${ln.id} · P${ln.priority} · ${(ln.length_m / 1000).toFixed(1)} km`, small = TF.pw < 520;
+  const tx = `${ln.id} · prio ${ln.priority} · ${(ln.length_m / 1000).toFixed(1)} km`, small = TF.pw < 520;
   g.font = `700 ${small ? 10 : 11.5}px ` + css("--mono"); const w = g.measureText(tx).width + 8, h = small ? 15 : 18;
   const cx = (T.x0 + T.x1) / 2, cy = (T.y0 + T.y1) / 2, ends = Math.hypot(ln.a[0] - cx, ln.a[1] - cy) > Math.hypot(ln.b[0] - cx, ln.b[1] - cy) ? [ln.a, ln.b] : [ln.b, ln.a];
   const clamp = (x, y) => [Math.max(TF.ml + 2, Math.min(TF.ml + TF.pw - w - 2, x)), Math.max(TF.mt + 2, Math.min(TF.mt + TF.ph - h - 2, y))];
@@ -203,7 +213,7 @@ function labelLine(g, ln, on, c, placed) {
   g.fillStyle = on ? css("--accent") : "rgba(255,255,255,.94)"; g.strokeStyle = c; g.lineWidth = 1.4; g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, 4) : g.rect(x, y, w, h); g.fill(); g.stroke();
   g.fillStyle = on ? css("--accent-ink") : "#111"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(tx, x + 4, y + h / 2 + 0.5);
 }
-const S = { layer: "relief", tracks: true, targets: true, st: true, sel: "L1", prop: "rho", lrho: 2.5, loop: "plan", cur: 10, noise: 1e-8, f: 10 };
+const S = { layer: "relief", tracks: true, targets: true, st: true, sel: "L2", prop: "rho", lrho: 2.5, loop: "plan", cur: 10, noise: 1e-8, f: 10 };
 
 // ---------------------------------------------------------------- helpers
 function lonlat(e, n) { const u = (e - D.ll.e0) / 1e4, v = (n - D.ll.n0) / 1e4, b = [1, u, v, u * u, u * v, v * v];
@@ -230,13 +240,15 @@ const sel = () => LINES.find((l) => l.id === S.sel);
 function renderStats() {
   const nTem = ST.method.filter((m) => m === "TEM").length, nAmt = NST - nTem, km = LINES.reduce((s, l) => s + l.length_m, 0) / 1000;
   const tpd = Number($("#in-tem")?.value || 25), apd = Number($("#in-amt")?.value || 6), days = Math.ceil(nTem / Math.max(1, tpd)) + Math.ceil(nAmt / Math.max(1, apd));
+  const dayCard = MODE === "week" ? `<div class="stat"><div class="k">Field days</div><div class="v">${Math.max(...ST.day)}</div><div class="s">TEM and AMT crews in parallel · priority 1 done by day ${Math.max(...ST.day.filter((d, i) => LINES.find((l) => l.id === ST.line[i]).priority === "1"))}</div></div>`
+    : `<div class="stat"><div class="k">Field days (one crew)</div><div class="v" id="days">${days}</div><div class="s"><label>TEM/day <input id="in-tem" type="number" min="5" max="80" value="${tpd}"></label> <label>AMT/day <input id="in-amt" type="number" min="1" max="20" value="${apd}"></label></div></div>`;
   $("#stats").innerHTML = `
     <div class="stat"><div class="k">Lines</div><div class="v">${LINES.length}</div><div class="s">${LINES.filter((l) => l.priority === "1").length} with priority 1 · ${km.toFixed(1)} line-km</div></div>
     <div class="stat"><div class="k">TEM soundings</div><div class="v">${nTem}</div><div class="s">central loop, 50–100 m steps</div></div>
     <div class="stat"><div class="k">AMT soundings</div><div class="v">${nAmt}</div><div class="s">250–500 m steps</div></div>
     <div class="stat"><div class="k">Targets</div><div class="v">${D.targets.length}</div><div class="s">${D.targets.filter((t) => t.top_depth < 100).length} reach within 100 m of the surface</div></div>
-    <div class="stat"><div class="k">Field days (estimate)</div><div class="v" id="days">${days}</div><div class="s"><label>TEM/day <input id="in-tem" type="number" min="5" max="80" value="${tpd}"></label> <label>AMT/day <input id="in-amt" type="number" min="1" max="20" value="${apd}"></label></div></div>`;
-  $("#in-tem").addEventListener("change", renderStats); $("#in-amt").addEventListener("change", renderStats);
+    ${dayCard}`;
+  $("#in-tem")?.addEventListener("change", renderStats); $("#in-amt")?.addEventListener("change", renderStats);
 }
 
 // ---------------------------------------------------------------- map
@@ -271,6 +283,7 @@ function drawMap() {
     const hx = Math.max(...t.hull.map((p) => p[0])), hy = Math.max(...t.hull.map((p) => p[1])); g.fillText(t.id, TF.x(hx) + 10, TF.y(hy) - 6);
   }
   const pending = [], placed = [];
+  if (MODE === "week") for (const ln of D.lines) if (!LINES.some((l) => l.id === ln.id)) { g.strokeStyle = "rgba(55,55,55,.7)"; g.setLineDash([5, 5]); g.lineWidth = 2.5; g.beginPath(); g.moveTo(TF.x(ln.a[0]), TF.y(ln.a[1])); g.lineTo(TF.x(ln.b[0]), TF.y(ln.b[1])); g.stroke(); g.setLineDash([]); }
   for (const ln of LINES) {
     const on = ln.id === S.sel, c = lineColour(ln);
     g.lineCap = "round"; g.strokeStyle = "#fff"; g.lineWidth = on ? 9 : 6; g.beginPath(); g.moveTo(TF.x(ln.a[0]), TF.y(ln.a[1])); g.lineTo(TF.x(ln.b[0]), TF.y(ln.b[1])); g.stroke();
@@ -321,7 +334,8 @@ function renderCard() {
   let h = `<div class="phead"><h3>${ln.id}</h3><div class="chips"><span class="chip ${ln.priority === "1" ? "p1" : ""}">priority ${ln.priority}</span>${ln.n_tem ? '<span class="chip tem">TEM</span>' : ""}${ln.n_amt ? '<span class="chip amt">AMT</span>' : ""}</div></div>
     <p class="note" style="color:var(--ink)">${ln.purpose.replace(/^./, (c) => c.toUpperCase())}.</p>
     <dl class="kv"><dt>Length</dt><dd>${(ln.length_m / 1000).toFixed(2)} km</dd>
-    ${ln.n_tem ? `<dt>TEM</dt><dd>${ln.n_tem} soundings · ${ln.loop_m} m loop · every ${ln.spacing_m} m</dd>` : ""}
+    ${ln.n_tem ? `<dt>TEM</dt><dd>${ln.n_tem} soundings · ${ln.loop_m} m loop · ${ln.outer_m && ln.outer_m !== ln.spacing_m ? `${ln.spacing_m} m over the target, ${ln.outer_m} m outside` : "every " + ln.spacing_m + " m"}</dd>` : ""}
+    ${ST.day ? `<dt>Field days</dt><dd>${(() => { const d = ST.day.filter((x, i) => ST.line[i] === ln.id); return Math.min(...d) === Math.max(...d) ? "day " + d[0] : "days " + Math.min(...d) + "–" + Math.max(...d); })()}</dd>` : ""}
     ${ln.n_amt ? `<dt>AMT</dt><dd>${ln.n_amt} soundings · every ${ln.amt_spacing_m} m</dd>` : ""}
     <dt>Start (west)</dt><dd>${la1.toFixed(5)}° N, ${lo1.toFixed(5)}° E</dd><dt>End</dt><dd>${la2.toFixed(5)}° N, ${lo2.toFixed(5)}° E</dd>`;
   if (L) h += `<dt>TEM sees to</dt><dd>~${Math.round(temDoi(L, r))} m at ${fmtRho(r)}</dd>`;
@@ -359,7 +373,7 @@ function drawProfile() {
   [lo, (lo + hi) / 2, hi].forEach((v) => g.fillText(Math.round(v) + " m", ml - 4, Y(v)));
   g.textAlign = "center"; g.textBaseline = "top"; const st = niceStep(ln.length_m, 5);
   for (let x = 0; x <= ln.length_m + 1; x += st) g.fillText((x / 1000).toFixed(st < 1000 ? 1 : 0), X(x), mt + ph + 4);
-  g.textAlign = "right"; g.fillText("km", ml + pw, mt + ph + 4); g.strokeStyle = css("--line"); g.strokeRect(ml + 0.5, mt + 0.5, pw, ph);
+  g.textAlign = "right"; g.fillText("km", ml + pw + 6, mt + ph + 14); g.strokeStyle = css("--line"); g.strokeRect(ml + 0.5, mt + 0.5, pw, ph);
   let smax = 0, climb = 0; for (let i = 1; i < z.length; i++) { const dz = z[i] - z[i - 1]; smax = Math.max(smax, Math.abs(dz) / (d[i] - d[i - 1])); if (dz > 0) climb += dz; }
   $("#prof-stats").textContent = `${Math.round(zmin)}–${Math.round(zmax)} m a.s.l. · relief ${Math.round(zmax - zmin)} m · total climb ${Math.round(climb)} m · steepest ${(Math.atan(smax) * 180 / Math.PI).toFixed(0)}° (200 m DEM)` +
     (Math.atan(smax) * 180 / Math.PI > 15 ? " · steep: lay loops on the flatter parts" : "");
@@ -477,8 +491,8 @@ function drawRes() {
 function renderTable() {
   const ln = sel(), rows = []; for (let i = 0; i < NST; i++) if (ST.line[i] === ln.id) rows.push(i);
   $("#st-name").textContent = `${ln.id} · ${rows.length} stations`;
-  $("#tbl-st").innerHTML = "<thead><tr><th>Station</th><th>Method</th><th>Loop</th><th>Distance</th><th>Latitude</th><th>Longitude</th><th>Easting</th><th>Northing</th><th>To track</th></tr></thead><tbody>" +
-    rows.map((i) => `<tr><td>${ST.station[i]}</td><td>${ST.method[i]}</td><td>${ST.loop_m[i] ? ST.loop_m[i] + " m" : "—"}</td><td>${Math.round(ST.distance_m[i])} m</td><td>${ST.lat[i].toFixed(6)}</td><td>${ST.lon[i].toFixed(6)}</td><td>${ST.easting[i].toFixed(0)}</td><td>${ST.northing[i].toFixed(0)}</td><td>${Math.round(ST.nearest_traverse_m[i])} m</td></tr>`).join("") + "</tbody>";
+  $("#tbl-st").innerHTML = "<thead><tr><th>Station</th>" + (ST.day ? "<th>Day</th>" : "") + "<th>Method</th><th>Loop</th><th>Distance</th><th>Latitude</th><th>Longitude</th><th>Easting</th><th>Northing</th><th>To track</th></tr></thead><tbody>" +
+    rows.map((i) => `<tr><td>${ST.station[i]}</td>${ST.day ? `<td>${ST.day[i]}</td>` : ""}<td>${ST.method[i]}</td><td>${ST.loop_m[i] ? ST.loop_m[i] + " m" : "—"}</td><td>${Math.round(ST.distance_m[i])} m</td><td>${ST.lat[i].toFixed(6)}</td><td>${ST.lon[i].toFixed(6)}</td><td>${ST.easting[i].toFixed(0)}</td><td>${ST.northing[i].toFixed(0)}</td><td>${Math.round(ST.nearest_traverse_m[i])} m</td></tr>`).join("") + "</tbody>";
 }
 let DL = null;
 (async () => { try { DL = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { DL = null; } })();
@@ -488,10 +502,12 @@ async function saveFile(name, text, mime) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   st.textContent = "Saving " + name + " (if nothing happens, use the downloaded copy of this page)";
 }
-$("#dl-csv").addEventListener("click", () => saveFile("em_stations.csv", D.files["em_stations.csv"], "text/csv"));
-$("#dl-gpx").addEventListener("click", () => saveFile("em_survey.gpx", D.files["em_survey.gpx"], "application/gpx+xml"));
-$("#dl-kml").addEventListener("click", () => saveFile("em_survey.kml", D.files["em_survey.kml"], "application/vnd.google-earth.kml+xml"));
-$("#dl-lines").addEventListener("click", () => saveFile("em_lines_and_targets.csv", D.files["em_lines.csv"] + "\n" + D.files["em_targets.csv"], "text/csv"));
+const W_ = () => MODE === "week";
+$("#dl-csv").addEventListener("click", () => { const f = W_() ? "em_week_stations.csv" : "em_stations.csv"; saveFile(f, D.files[f], "text/csv"); });
+$("#dl-gpx").addEventListener("click", () => { const f = W_() ? "em_week.gpx" : "em_survey.gpx"; saveFile(f, D.files[f], "application/gpx+xml"); });
+$("#dl-kml").addEventListener("click", () => { const f = W_() ? "em_week.kml" : "em_survey.kml"; saveFile(f, D.files[f], "application/vnd.google-earth.kml+xml"); });
+$("#dl-lines").addEventListener("click", () => W_() ? saveFile("em_week_lines_and_schedule.csv", D.files["em_week_lines.csv"] + "\n" + D.files["em_week_schedule.csv"], "text/csv")
+  : saveFile("em_lines_and_targets.csv", D.files["em_lines.csv"] + "\n" + D.files["em_targets.csv"], "text/csv"));
 
 // ---------------------------------------------------------------- wiring
 function seg(id, key, after) { const el = $(id); el.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S[key] = b.dataset.v; el.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); after(); }); }
@@ -510,6 +526,22 @@ function redraw() { drawMap(); drawSection(); drawDoi(); drawRes(); }
 let rt = 0; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(redraw, 60); }).observe(document.querySelector(".wrap"));
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", redraw);
 new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+function renderSchedule() {
+  const on = MODE === "week"; $("#sched-panel").hidden = !on;
+  $("#mode-note").innerHTML = on ? `<b>One-week campaign.</b> The ${LINES.length} most important lines, shortened to the targets, with dense stations only over each target. A TEM crew and an AMT crew work in parallel. Priority 1 lines (R1, L2, L1, L4) come first; priority 2 lines (L5, L6, L3) close the week and are the first to drop if time runs short. The 23.8 km regional AMT traverse P1 (faint grey) moves to a later campaign. Record soil gas (H2, CH4, CO2, He, Rn) at every TEM station.`
+    : `<b>Full plan.</b> All ${LINES.length} lines at their full length with a single crew; about four weeks of fieldwork.`;
+  if (!on) return;
+  const sc = D.week.schedule, days = Math.max(...sc.map((r) => r.day)), crews = ["TEM crew", "AMT crew"];
+  $("#sched-sub").textContent = `TEM ${D.week.rates.tem["100"]}/day with 100 m loops, ${D.week.rates.tem["400"]}/day with 400 m loops; AMT ${D.week.rates.amt}/day; day 1 starts after mobilisation`;
+  const col = (id) => { const l = LINES.find((x) => x.id === id); return l.target in TARGETS ? KCOL[TARGETS[l.target].kind] : lineColour(l); };
+  $("#tbl-sched").innerHTML = `<thead><tr><th>Crew</th>${Array.from({ length: days }, (_, d) => `<th style="text-align:left">Day ${d + 1}</th>`).join("")}</tr></thead><tbody>` +
+    crews.map((c) => `<tr><td>${c}</td>${Array.from({ length: days }, (_, d) => `<td style="text-align:left;vertical-align:top">${sc.filter((r) => r.crew === c && r.day === d + 1).map((r) =>
+      `<button class="sched" data-id="${r.line}" style="border-color:${col(r.line)}"><b>${r.line}</b> ${r.soundings}</button>`).join(" ") || "—"}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  $("#tbl-sched").querySelectorAll("button.sched").forEach((b) => b.addEventListener("click", () => select(b.dataset.id)));
+}
+$("#seg-mode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b || b.dataset.v === MODE) return;
+  $("#seg-mode").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); setPlan(b.dataset.v);
+  if (!LINES.some((l) => l.id === S.sel)) S.sel = "L2"; renderStats(); renderSchedule(); select(S.sel); });
 try { const s = localStorage.getItem("wgem-line"); if (s && LINES.some((l) => l.id === s)) S.sel = s; } catch (e) { /* storage unavailable */ }
-renderStats(); renderH2(); $("#lab-rho").textContent = fmtRho(rhoHost()); select(S.sel); drawDoi(); drawRes();
+renderStats(); renderSchedule(); renderH2(); $("#lab-rho").textContent = fmtRho(rhoHost()); select(S.sel); drawDoi(); drawRes();
 </script>

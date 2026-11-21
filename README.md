@@ -90,7 +90,9 @@ writes `outputs/em_survey/`: the plan sheets `EM_Survey_Plan.pdf` (summary, plan
 depths of investigation, expected resistivities), the station list (CSV) and `em_survey.gpx` / `.kml` for field GPS.
 `python scripts/build_em_plan_html.py` then builds `web/Wadi_Ghadir_EM_Survey_Planner.html`, the same plan as an
 interactive page: map layers, line and target cards, sections whose depth of investigation follows the host
-resistivity, loop, current and noise chosen on the page, a field-days estimate and the field files to download.
+resistivity, loop, current and noise chosen on the page, a field-days estimate and the field files to download. A one-week variant (`EM_Survey_Week_Plan.pdf`, `em_week_*`)
+keeps the seven most important lines, shortened to the targets with dense stations only over them, and schedules a TEM and
+an AMT crew day by day; the planner opens on it and switches to the full plan.
 
 **From the command line:**
 

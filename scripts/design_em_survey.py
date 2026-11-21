@@ -273,7 +273,7 @@ def plan_map(ax_g, ax_m, targets, lines, st, g, m):
                     path_effects=[pe.Stroke(linewidth=4, foreground="w"), pe.Normal()])
             s = st[st.line == ln["id"]]
             ax.plot(km(s.easting), km(s.northing), "|", color=c, ms=4, zorder=5)
-            ax.annotate(f"{ln['id']} · P{ln['priority']} · {ln['length_m'] / 1000:.1f} km", km(ln["b"]), xytext=(4, 4), textcoords="offset points", fontsize=9, weight="bold", color=c,
+            ax.annotate(f"{ln['id']} · prio {ln['priority']} · {ln['length_m'] / 1000:.1f} km", km(ln["b"]), xytext=(4, 4), textcoords="offset points", fontsize=9, weight="bold", color=c,
                         path_effects=[pe.withStroke(linewidth=3, foreground="w")], zorder=6)
         ax.set_aspect("equal")
         ax.set_xlabel("easting [km], UTM 36N")
@@ -339,6 +339,150 @@ def compute():
         ln["n_tem"] = int((st.line == ln["id"]).sum() - ((st.line == ln["id"]) & (st.method == "AMT")).sum())
         ln["n_amt"] = int(((st.line == ln["id"]) & (st.method == "AMT")).sum())
     return mesh, act, rho, chi, g, m, targets, lines, st
+
+
+# -----------------------------------------------------------------------------
+# One-week campaign: the most important lines, shortened, with dense stations only over the targets
+WEEK_DAYS = 7
+TEM_RATE = {100: 30, 200: 22, 400: 12}   # TEM soundings per day by loop side (moving loop, one crew)
+AMT_RATE = 7                             # AMT soundings per day (one crew, two or three systems leap-frogging)
+FIRST_DAY = 0.6                          # share of day 1 left after mobilisation and instrument tests
+MOVE_DAYS = 0.15                         # moving to another line
+# line, priority, length [km], TEM loop [m], TEM step over the target / outside [m], AMT step [m], why
+WEEK = [
+    ("R1", "1", 1.0, 200, 100, 100, 0, "background resistivity and noise level: calibrates every other line"),
+    ("L2", "1", 2.0, 100, 50, 100, 500, "strongest magnetic anomaly, dense and magnetic: possible active serpentinisation front (H2 source)"),
+    ("L1", "1", 2.4, 100, 50, 100, 500, "shallow magnetic body with a dense and magnetic core: H2 source candidate"),
+    ("L4", "1", 3.0, 400, 200, 200, 250, "deep magnetic body (top ~700 m) and its faults: source at depth and pathways"),
+    ("L5", "2", 2.0, 100, 50, 100, 0, "shallow magnetic body in the east: serpentinite or magnetite-rich mafic rock"),
+    ("L6", "2", 2.0, 100, 100, 100, 0, "low-density body at the coast: reservoir and seal side of the H2 system"),
+    ("L3", "2", 4.0, 0, 0, 0, 250, "deep dense block (top ~1.1 km): AMT only, fluid paths into it"),
+]
+
+
+def week_plan(lines, g, m):
+    """Lines, stations and day-by-day schedule of the one-week campaign."""
+    from scipy.spatial import cKDTree
+    tree = cKDTree(np.r_[g["data_xyz"][:, :2], m["data_xyz"][:, :2]])
+    full = {ln["id"]: ln for ln in lines}
+    wlines, rows = [], []
+    for lid, prio, L_km, loop, core, outer, amt, why in WEEK:
+        src = full[lid]
+        u = (src["b"] - src["a"]) / src["length_m"]
+        mid = (src["a"] + src["b"]) / 2
+        L = L_km * 1000.0
+        a, b = mid - u * L / 2, mid + u * L / 2
+        ln = dict(id=lid, target=src["target"], priority=prio, a=a, b=b, length_m=L, loop_m=loop, spacing_m=core, outer_m=outer,
+                  amt_spacing_m=amt, purpose=why, method=("TEM + AMT" if loop and amt else "TEM central loop" if loop else "AMT"))
+        sets = []
+        if loop:
+            d = np.unique(np.round(np.r_[np.arange(0, L + 1, outer), np.arange(L / 2 - 500, L / 2 + 501, core), L], 1))
+            sets.append(("TEM", d[(d >= 0) & (d <= L)]))
+        if amt:
+            sets.append(("AMT", np.arange(0, L + 1, amt)))
+        for kind, dd in sets:
+            ee, nn = a[0] + dd * u[0], a[1] + dd * u[1]
+            lon, lat = W.to_lonlat(ee, nn)
+            dist, _ = tree.query(np.c_[ee, nn])
+            for k, (x, y, lo, la, di, dt) in enumerate(zip(ee, nn, lon, lat, dd, dist)):
+                rows.append(dict(line=lid, station=f"{lid}-{kind}{k:03d}", method=kind, distance_m=round(float(di), 1), easting=round(float(x), 1),
+                                 northing=round(float(y), 1), lon=round(float(lo), 6), lat=round(float(la), 6), loop_m=loop if kind == "TEM" else 0,
+                                 nearest_traverse_m=round(float(dt), 0)))
+        wlines.append(ln)
+    st = pd.DataFrame(rows)
+    st["day"] = 0
+    sched = []
+    for crew, kind in (("TEM crew", "TEM"), ("AMT crew", "AMT")):
+        day, left, first = 1, FIRST_DAY, True
+        for ln in wlines:
+            idx = st.index[(st.line == ln["id"]) & (st.method == kind)]
+            if not len(idx):
+                continue
+            if not first:
+                left -= MOVE_DAYS
+            first = False
+            cost = 1.0 / (TEM_RATE[ln["loop_m"]] if kind == "TEM" else AMT_RATE)
+            for i in idx:
+                if left < cost - 1e-9:
+                    day, left = day + 1, 1.0
+                st.loc[i, "day"] = day
+                left -= cost
+        for (d, lid), grp in st[st.method == kind].groupby(["day", "line"], sort=False):
+            sched.append(dict(day=int(d), crew=crew, line=lid, soundings=len(grp), first=grp.station.iloc[0], last=grp.station.iloc[-1]))
+    sched = pd.DataFrame(sched).sort_values(["day", "crew"]).reset_index(drop=True)
+    for ln in wlines:
+        ln["n_tem"] = int(((st.line == ln["id"]) & (st.method == "TEM")).sum())
+        ln["n_amt"] = int(((st.line == ln["id"]) & (st.method == "AMT")).sum())
+    return wlines, st, sched
+
+
+def write_week(wlines, wst, sched, targets, g, m):
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    hdr = f"# Wadi Ghadir one-week EM campaign, {AUTHOR}. UTM 36N / WGS 84.\n"
+    ldf = pd.DataFrame([{"order": k + 1, "line": ln["id"], "priority": ln["priority"], "method": ln["method"], "loop_m": ln["loop_m"],
+                         "tem_step_m": f"{ln['spacing_m']}/{ln['outer_m']}" if ln["loop_m"] else "", "amt_step_m": ln["amt_spacing_m"] or "",
+                         "length_km": ln["length_m"] / 1000, "tem_stations": ln["n_tem"], "amt_stations": ln["n_amt"],
+                         "days": f"{wst[wst.line == ln['id']].day.min()}-{wst[wst.line == ln['id']].day.max()}", "why": ln["purpose"]}
+                        for k, ln in enumerate(wlines)])
+    for df, name in ((ldf, "em_week_lines.csv"), (wst, "em_week_stations.csv"), (sched, "em_week_schedule.csv")):
+        with open(os.path.join(OUT, name), "w") as f:
+            f.write(hdr)
+            df.to_csv(f, index=False)
+    write_gps(wlines, wst, os.path.join(OUT, "em_week.gpx"), os.path.join(OUT, "em_week.kml"))
+    fig_map, (a1, a2) = plt.subplots(1, 2, figsize=(16.5, 5.9))
+    plan_map(a1, a2, targets, wlines, wst, g, m)
+    fig_map.suptitle(f"Wadi Ghadir: one-week EM campaign · {AUTHOR}", fontsize=11, weight="bold")
+    fig_map.tight_layout(rect=(0, 0, 1, 0.95))
+    fig_map.savefig(os.path.join(OUT, "em_week_map.png"), dpi=170)
+    days = int(wst.day.max())
+    fig_g, ax = plt.subplots(figsize=(16.5, 3.6))
+    cols = {ln["id"]: c for ln, c in zip(wlines, plt.cm.tab10.colors)}
+    for r, crew in enumerate(("TEM crew", "AMT crew")):
+        sub = sched[sched.crew == crew]
+        for d in range(1, days + 1):
+            rows_d = list(sub[sub.day == d].itertuples())
+            x0 = d - 1 + (0 if d > 1 else 1 - FIRST_DAY)
+            ws = [row.soundings / (TEM_RATE[next(ln["loop_m"] for ln in wlines if ln["id"] == row.line)] if crew == "TEM crew" else AMT_RATE) for row in rows_d]
+            gap = 0.03
+            scale = min(1.0, (d - x0 - gap * len(ws)) / max(sum(ws), 1e-9))   # keep each day's blocks inside the day
+            for row, w in zip(rows_d, ws):
+                w *= scale
+                ax.barh(r, w, left=x0 + gap / 2, color=cols[row.line], edgecolor="w")
+                ax.text(x0 + gap / 2 + w / 2, r, f"{row.line}\n{row.soundings}", ha="center", va="center", fontsize=8, color="w", weight="bold")
+                x0 += w + gap
+    ax.set_yticks([0, 1], ["TEM crew", "AMT crew"])
+    ax.set_xticks(np.arange(days) + 0.5, [f"day {d}" for d in range(1, days + 1)])
+    ax.set_xlim(0, max(days, WEEK_DAYS))
+    ax.axvspan(0, 1 - FIRST_DAY, color="0.9")
+    ax.text((1 - FIRST_DAY) / 2, 0.5, "mobilise,\ntests", ha="center", va="center", fontsize=8, color="0.4")
+    for d in range(1, WEEK_DAYS):
+        ax.axvline(d, color="0.8", lw=0.8)
+    ax.invert_yaxis()
+    ax.set_title(f"Schedule: {len(wst[wst.method == 'TEM'])} TEM and {len(wst[wst.method == 'AMT'])} AMT soundings in {days} days "
+                 f"(TEM {TEM_RATE[100]}/day with 100 m loops, {TEM_RATE[400]}/day with 400 m; AMT {AMT_RATE}/day; day 1 starts after mobilisation)", loc="left", fontsize=9)
+    fig_g.tight_layout()
+    fig_g.savefig(os.path.join(OUT, "em_week_schedule.png"), dpi=150)
+    with PdfPages(os.path.join(OUT, "EM_Survey_Week_Plan.pdf")) as pdf:
+        fs = plt.figure(figsize=(16.5, 11.7))
+        fs.text(0.04, 0.95, "Wadi Ghadir: one-week EM campaign (most important lines)", fontsize=18, weight="bold")
+        fs.text(0.04, 0.925, f"{AUTHOR} · priority 1 first; priority 2 lines are dropped first if time runs short · P1 regional AMT moves to a later campaign", fontsize=10)
+        ax = fs.add_axes((0.04, 0.45, 0.92, 0.44))
+        ax.axis("off")
+        tb = ldf.drop(columns=["why"]).astype(str)
+        t = ax.table(cellText=tb.values, colLabels=tb.columns, loc="upper left", cellLoc="center")
+        t.auto_set_font_size(False)
+        t.set_fontsize(9)
+        t.scale(1, 1.5)
+        fs.text(0.04, 0.5, "\n".join(f"{ln['id']}: {ln['purpose']}" for ln in wlines) +
+                "\n\nAt every TEM station: soil gas (H2, CH4, CO2, He, Rn) in a 1 m probe by a third person. Day 7 is the reserve for repeats and QC.",
+                fontsize=9.5, va="top", linespacing=1.6)
+        pdf.savefig(fs)
+        pdf.savefig(fig_map)
+        pdf.savefig(fig_g)
+    plt.close("all")
+    print(ldf.drop(columns=["why"]).to_string(index=False))
+    print(sched.to_string(index=False))
 
 
 def main():
@@ -469,6 +613,8 @@ def main():
     print(tdf[["id", "kind", "e", "n", "top_depth", "centre_depth", "top_elev", "bottom_elev", "peak", "volume_km3", "dense_magnetic_share"]].to_string(index=False))
     print(ldf[["line", "target", "priority", "method", "loop_m", "length_km", "tem_stations", "amt_stations"]].to_string(index=False))
     print(f"stations: {len(st)}; median distance to an existing traverse {st.nearest_traverse_m.median():.0f} m")
+    wlines, wst, sched = week_plan(lines, g, m)
+    write_week(wlines, wst, sched, targets, g, m)
     print("wrote", OUT)
 
 

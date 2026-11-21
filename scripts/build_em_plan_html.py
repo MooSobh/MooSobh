@@ -69,15 +69,18 @@ def main():
     args = ap.parse_args()
     mesh, act, rho, chi, g, m, targets, lines, st = E.compute()
     T = terrain(mesh, 5)
-    sections = {}
-    for ln in lines:
+    wlines, wst, sched = E.week_plan(lines, g, m)
+
+    def sec_of(ln):
         d, zc, R = W.section(mesh, rho, tuple(ln["a"]), tuple(ln["b"]), step=50.0, zmin=E.ZMIN)
         _, _, C = W.section(mesh, chi, tuple(ln["a"]), tuple(ln["b"]), step=50.0, zmin=E.ZMIN)
         zb = zc - mesh.h[2][-len(zc):] / 2
         zt = zc + mesh.h[2][-len(zc):] / 2
         qr = np.where(np.isfinite(R), np.round(np.clip(R / 0.3, -1, 1) * 127), -128).astype(np.int8)
         qc = np.where(np.isfinite(C), np.round(np.clip(C / 0.3, 0, 1) * 127), -128).astype(np.int8)
-        sections[ln["id"]] = {"n": len(d), "step": 50.0, "zb": zb.tolist(), "zt": zt.tolist(), "rho": b64(qr), "chi": b64(qc)}
+        return {"n": len(d), "step": 50.0, "zb": zb.tolist(), "zt": zt.tolist(), "rho": b64(qr), "chi": b64(qc)}
+    sections = {ln["id"]: sec_of(ln) for ln in lines}
+    week_sections = {ln["id"]: sec_of(ln) for ln in wlines}
     tlist = []
     for t in targets:
         from scipy.spatial import ConvexHull
@@ -88,16 +91,23 @@ def main():
                       "top_depth": t["top_depth"], "centre_depth": t["centre_depth"], "bottom_elev": t["bottom_elev"],
                       "peak": t["peak"], "other_mean": float(t["other_mean"]), "volume_km3": t["volume_km3"], "dense_magnetic_share": t["dense_magnetic_share"],
                       "hull": np.round(hull, 1).tolist()})
+    wlist = [{"id": ln["id"], "target": ln["target"], "priority": ln["priority"], "method": ln["method"], "loop_m": ln["loop_m"],
+              "spacing_m": ln["spacing_m"], "outer_m": ln["outer_m"], "amt_spacing_m": ln["amt_spacing_m"], "length_m": ln["length_m"],
+              "a": [float(v) for v in ln["a"]], "b": [float(v) for v in ln["b"]], "purpose": ln["purpose"],
+              "n_tem": ln["n_tem"], "n_amt": ln["n_amt"]} for ln in wlines]
     llist = [{"id": ln["id"], "target": ln["target"], "priority": ln["priority"], "method": ln["method"], "loop_m": ln["loop_m"],
               "spacing_m": ln["spacing_m"] if ln["loop_m"] else 0, "amt_spacing_m": ln["amt_spacing_m"], "length_m": ln["length_m"],
               "a": [float(v) for v in ln["a"]], "b": [float(v) for v in ln["b"]], "purpose": ln["purpose"],
               "n_tem": ln["n_tem"], "n_amt": ln["n_amt"]} for ln in lines]
     files = {}
-    for name in ("em_stations.csv", "em_lines.csv", "em_targets.csv", "em_survey.gpx", "em_survey.kml"):
+    for name in ("em_stations.csv", "em_lines.csv", "em_targets.csv", "em_survey.gpx", "em_survey.kml",
+                 "em_week_stations.csv", "em_week_lines.csv", "em_week_schedule.csv", "em_week.gpx", "em_week.kml"):
         files[name] = open(os.path.join(E.OUT, name), encoding="utf-8").read()
     payload = {"written_by": "Mohamed Sobh, LIAG", "terrain": T, "grids": grids(T, g), "ll": lonlat_fit(T),
                "tracks": {"gravity": np.round(g["data_xyz"][:, :2], 0).tolist(), "magnetic": np.round(m["data_xyz"][:, :2], 0).tolist()},
                "targets": tlist, "lines": llist, "stations": st.to_dict(orient="list"), "sections": sections,
+               "week": {"lines": wlist, "stations": wst.to_dict(orient="list"), "sections": week_sections, "schedule": sched.to_dict(orient="records"),
+                        "rates": {"tem": E.TEM_RATE, "amt": E.AMT_RATE, "first_day": E.FIRST_DAY, "move": E.MOVE_DAYS, "days": E.WEEK_DAYS}},
                "tem": {"current": E.TEM_CURRENT_A, "noise": E.TEM_NOISE, "last_gate": E.TEM_LAST_GATE_S},
                "resistivities": {k: list(v) for k, v in E.RESISTIVITIES.items()}, "files": files}
     page = open(SRC, encoding="utf-8").read().replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
