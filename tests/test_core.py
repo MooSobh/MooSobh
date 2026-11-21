@@ -251,3 +251,13 @@ def test_inversion_explorer_packing():
     assert abs(-0.3 + q[4] / 254 * 0.6 - 0.15) < 0.6 / 254
     assert X.compactness(np.r_[np.ones(9), np.zeros(91)]) == 0.09
     assert abs(X.compactness(np.ones(100)) - 0.90) < 1e-12
+
+
+def test_em_synthetic_petrophysics():
+    """scripts/em_synthetic.py: density/susceptibility classes map to the scenario resistivities."""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    import em_synthetic as S
+    rb = np.array([0.0, 0.1, -0.1, -0.05, -0.03])
+    cb = np.array([0.0, 0.0, 0.0, 0.02, 0.01])
+    r = S.petro(rb, cb, S.RHO["serp_wet"])
+    assert r.tolist() == [S.RHO["host"], S.RHO["dense"], S.RHO["light"], S.RHO["serp_wet"], S.RHO["serp_wet"]]

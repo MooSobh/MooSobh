@@ -20,7 +20,7 @@ With conda or mamba (recommended: rasterio and pyproj come with their binary lib
 ```bash
 conda env create -f environment.yml
 conda activate wghadir
-python -m pytest -q              # 18 tests, about 10 s
+python -m pytest -q              # 19 tests, about 10 s
 ```
 
 With pip, using an existing Python ≥ 3.10:
@@ -92,8 +92,11 @@ depths of investigation, expected resistivities), the station list (CSV) and `em
 `python scripts/build_em_plan_html.py` then builds `web/Wadi_Ghadir_EM_Survey_Planner.html`, the same plan as an
 interactive page: map layers, line and target cards, sections whose depth of investigation follows the host
 resistivity, loop, current and noise chosen on the page, a field-days estimate and the field files to download. A one-week variant (`EM_Survey_Week_Plan.pdf`, `em_week_*`)
-keeps the seven most important lines, shortened to the targets with dense stations only over them, and schedules a TEM and
-an AMT crew day by day; the planner opens on it and switches to the full plan.
+keeps the most important lines, shortened to the targets with dense stations only over them, and schedules a TEM and
+an AMT crew day by day; the planner opens on it and switches to the full plan. `python scripts/em_synthetic.py` then tests each one-week line
+synthetically: a resistivity model from the inversions (wet serpentinite 30 Ωm, dry 800 Ωm, host 2000 Ωm), 1-D SimPEG TEM
+and AMT forward modelling with noise and inversion at every station, the depth of investigation (Oldenburg and Li) and
+the detectability of the serpentinite (`outputs/em_survey/synthetic/`, `EM_Synthetic_Study.pdf`); the planner shows it per line.
 
 **From the command line:**
 

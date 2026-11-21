@@ -104,7 +104,23 @@ def main():
     for name in ("em_stations.csv", "em_lines.csv", "em_targets.csv", "em_survey.gpx", "em_survey.kml",
                  "em_week_stations.csv", "em_week_lines.csv", "em_week_schedule.csv", "em_week.gpx", "em_week.kml"):
         files[name] = open(os.path.join(E.OUT, name), encoding="utf-8").read()
-    payload = {"written_by": "Mohamed Sobh, LIAG", "terrain": T, "grids": grids(T, g), "ll": lonlat_fit(T),
+    synthetic = {}
+    sdir = os.path.join(E.OUT, "synthetic")
+    if os.path.exists(os.path.join(sdir, "em_synthetic_summary.csv")):
+        import io
+        from PIL import Image
+        summ = pd.read_csv(os.path.join(sdir, "em_synthetic_summary.csv"), comment="#")
+        for row in summ.to_dict(orient="records"):
+            png = os.path.join(sdir, f"em_synthetic_{row['line']}.png")
+            if not os.path.exists(png):
+                continue
+            im = Image.open(png).convert("RGB")
+            im.thumbnail((1500, 1500))
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=78, optimize=True)
+            row = {k: (None if isinstance(v, float) and np.isnan(v) else v) for k, v in row.items()}
+            synthetic[row["line"]] = {"summary": row, "img": "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()}
+    payload = {"written_by": "Mohamed Sobh, LIAG", "synthetic": synthetic, "terrain": T, "grids": grids(T, g), "ll": lonlat_fit(T),
                "tracks": {"gravity": np.round(g["data_xyz"][:, :2], 0).tolist(), "magnetic": np.round(m["data_xyz"][:, :2], 0).tolist()},
                "targets": tlist, "lines": llist, "stations": st.to_dict(orient="list"), "sections": sections,
                "week": {"lines": wlist, "stations": wst.to_dict(orient="list"), "sections": week_sections, "schedule": sched.to_dict(orient="records"),
