@@ -86,7 +86,7 @@ def main():
         lon, lat = W.to_lonlat(t["e"], t["n"])
         tlist.append({"id": t["id"], "kind": t["kind"], "e": t["e"], "n": t["n"], "lon": float(lon), "lat": float(lat),
                       "top_depth": t["top_depth"], "centre_depth": t["centre_depth"], "bottom_elev": t["bottom_elev"],
-                      "peak": t["peak"], "volume_km3": t["volume_km3"], "dense_magnetic_share": t["dense_magnetic_share"],
+                      "peak": t["peak"], "other_mean": float(t["other_mean"]), "volume_km3": t["volume_km3"], "dense_magnetic_share": t["dense_magnetic_share"],
                       "hull": np.round(hull, 1).tolist()})
     llist = [{"id": ln["id"], "target": ln["target"], "priority": ln["priority"], "method": ln["method"], "loop_m": ln["loop_m"],
               "spacing_m": ln["spacing_m"] if ln["loop_m"] else 0, "amt_spacing_m": ln["amt_spacing_m"], "length_m": ln["length_m"],

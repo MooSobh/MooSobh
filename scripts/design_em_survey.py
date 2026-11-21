@@ -273,7 +273,7 @@ def plan_map(ax_g, ax_m, targets, lines, st, g, m):
                     path_effects=[pe.Stroke(linewidth=4, foreground="w"), pe.Normal()])
             s = st[st.line == ln["id"]]
             ax.plot(km(s.easting), km(s.northing), "|", color=c, ms=4, zorder=5)
-            ax.annotate(ln["id"], km(ln["b"]), xytext=(4, 4), textcoords="offset points", fontsize=9, weight="bold", color=c,
+            ax.annotate(f"{ln['id']} · P{ln['priority']} · {ln['length_m'] / 1000:.1f} km", km(ln["b"]), xytext=(4, 4), textcoords="offset points", fontsize=9, weight="bold", color=c,
                         path_effects=[pe.withStroke(linewidth=3, foreground="w")], zorder=6)
         ax.set_aspect("equal")
         ax.set_xlabel("easting [km], UTM 36N")

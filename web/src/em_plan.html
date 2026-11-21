@@ -81,6 +81,8 @@ th { position: sticky; top: 0; background: var(--panel); font: 500 11px var(--mo
 footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
 [hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+#tbl-h2 td, #tbl-h2 th, #tbl-h2t td { text-align: left; font-family: var(--body); vertical-align: top; }
+#tbl-h2 td:first-child, #tbl-h2t td:first-child { font-weight: 600; white-space: nowrap; }
 </style>
 
 <div class="wrap">
@@ -96,7 +98,7 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
 <div class="grid2">
   <div class="panel">
     <div class="phead"><h2>Plan map</h2>
-      <div class="ctl"><div class="seg" id="seg-layer"><button data-v="relief" aria-pressed="false">Relief</button><button data-v="grav" aria-pressed="true">Residual gravity</button><button data-v="rtp" aria-pressed="false">RTP magnetics</button></div></div></div>
+      <div class="ctl"><div class="seg" id="seg-layer"><button data-v="relief" aria-pressed="true">Relief</button><button data-v="grav" aria-pressed="false">Residual gravity</button><button data-v="rtp" aria-pressed="false">RTP magnetics</button></div></div></div>
     <div class="ctl">
       <label class="chk"><input type="checkbox" id="chk-tracks" checked> existing survey tracks</label>
       <label class="chk"><input type="checkbox" id="chk-targets" checked> target footprints</label>
@@ -122,6 +124,30 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
   <canvas id="cv-sec" aria-label="Vertical section along the selected line"></canvas>
   <div class="readout" id="ro-sec">Point at the section to read the model.</div>
   <p class="note" id="sec-verdict"></p>
+</div>
+
+<div class="panel" id="h2">
+  <div class="phead"><h2>What EM adds to gravity and magnetics, and the natural hydrogen (H2) system</h2><span class="sub">interpretation guide</span></div>
+  <p class="note" style="color:var(--ink)">Gravity maps density and magnetics maps magnetite. Neither sees water, porosity, clay or alteration. EM measures electrical resistivity, which is controlled by exactly those: pore water and its salinity, clay and alteration minerals, and connected magnetite, sulphides or graphite. EM adds the <b>wet</b> part of the picture.</p>
+  <p class="note">Wadi Ghadir lies in a Neoproterozoic ophiolite belt (serpentinised peridotite, gabbro, metavolcanics); check the units against the published geological map. Natural H2 forms when water oxidises the ferrous iron of olivine and pyroxene: <i>olivine + water → serpentine + magnetite + H2</i>. A working H2 system needs a source rock <b>and</b> water, pathways, and a trap with a seal, or a surface seep. Gravity and magnetics outline the source rocks; EM tests where water is and where it moves. EM does not detect H2 gas itself: it detects the conditions that make H2 form and migrate.</p>
+  <div class="tblwrap" style="max-height:none"><table id="tbl-h2">
+    <thead><tr><th>H2 system element</th><th>Gravity and magnetics</th><th>What EM adds</th><th>Lines</th></tr></thead>
+    <tbody>
+      <tr><td>Source: ultramafic rock</td><td>Serpentinised peridotite: low density, high χ. Fresh peridotite: dense, weakly magnetic</td><td>Separates dry, massive serpentinite (hundreds to thousands of Ωm) from fractured, wet, actively altering rock (10–100 Ωm) and connected magnetite (much lower)</td><td>L1, L2, L4, L5</td></tr>
+      <tr><td>Water for serpentinisation</td><td>Not visible</td><td>Fluid-bearing zones, depth to the water table, salinity (brines near the coast)</td><td>all TEM lines, R1</td></tr>
+      <tr><td>Pathways: faults, shear zones</td><td>Gradients and offsets between bodies</td><td>Narrow, steep conductors (fluids, clay gouge, graphite) traced to depth; AMT tipper and phase tensor give their strike and dip</td><td>L3, L4, P1</td></tr>
+      <tr><td>Reservoir and seal</td><td>Low-density body near the coast (sediments)</td><td>Depth to basement under the coastal plain, conductive clay or brine layers, resistive evaporite (anhydrite, halite) seals of the Red Sea margin</td><td>L6, P1</td></tr>
+      <tr><td>Seeps and leakage</td><td>Not visible</td><td>Shallow conductive anomalies under sub-circular depressions ("fairy circles"), to be paired with soil-gas H2</td><td>priority 1 TEM lines</td></tr>
+      <tr><td>Which mineral makes the anomaly</td><td>Magnetite, sulphide and graphite all look alike</td><td>Induced polarisation (TDIP) with resistivity tells magnetite from sulphide and graphite</td><td>L1, L2</td></tr>
+    </tbody></table></div>
+  <div class="k">Role of each target in the H2 system</div>
+  <div class="tblwrap" style="max-height:none"><table id="tbl-h2t"></table></div>
+  <div class="steps">
+    <div><h3>Soil gas at every EM station</h3><p>Measure H2 with CH4, CO2, He and Rn in 1 m probes at each TEM station; repeat at different times of day, since H2 flux varies daily. EM explains where the gas comes from.</p></div>
+    <div><h3>Water samples</h3><p>Sample springs and wells for dissolved H2, pH and Eh. Hyperalkaline water (pH 10–12) is the fingerprint of active serpentinisation.</p></div>
+    <div><h3>IP on the shallow magnetic lines</h3><p>Add time-domain IP on L1 and L2 to separate magnetite (H2 by-product) from sulphides and graphite.</p></div>
+    <div><h3>Joint interpretation</h3><p>Invert TEM and AMT with the gravity and magnetic geometry (cross-gradient coupling, as in notebook 08) so all four properties share their boundaries.</p></div>
+  </div>
 </div>
 
 <div class="chartgrid">
@@ -161,8 +187,23 @@ const LINES = D.lines, TARGETS = Object.fromEntries(D.targets.map((t) => [t.id, 
 const SECS = {}; for (const [k, s] of Object.entries(D.sections)) SECS[k] = Object.assign({}, s, { rho: new Int8Array(bytes(s.rho).buffer), chi: new Int8Array(bytes(s.chi).buffer) });
 const ST = D.stations, NST = ST.line.length;
 const KCOL = { magnetic: "#7b1fa2", dense: "#c62828", light: "#1565c0" };
-const lineColour = (ln) => (ln.id[0] === "P" ? css("--amt") : ln.id[0] === "R" ? css("--tem") : css("--ink"));
-const S = { layer: "grav", tracks: true, targets: true, st: true, sel: "L1", prop: "rho", lrho: 2.5, loop: "plan", cur: 10, noise: 1e-8, f: 10 };
+const lineColour = (ln) => (ln.method === "AMT" ? css("--amt") : ln.method.includes("AMT") ? "#8e44ad" : css("--tem"));
+function labelLine(g, ln, on, c, placed) {
+  // id · priority · length in a halo box; tries both ends and four sides, keeps clear of labels already placed
+  const tx = `${ln.id} · P${ln.priority} · ${(ln.length_m / 1000).toFixed(1)} km`, small = TF.pw < 520;
+  g.font = `700 ${small ? 10 : 11.5}px ` + css("--mono"); const w = g.measureText(tx).width + 8, h = small ? 15 : 18;
+  const cx = (T.x0 + T.x1) / 2, cy = (T.y0 + T.y1) / 2, ends = Math.hypot(ln.a[0] - cx, ln.a[1] - cy) > Math.hypot(ln.b[0] - cx, ln.b[1] - cy) ? [ln.a, ln.b] : [ln.b, ln.a];
+  const clamp = (x, y) => [Math.max(TF.ml + 2, Math.min(TF.ml + TF.pw - w - 2, x)), Math.max(TF.mt + 2, Math.min(TF.mt + TF.ph - h - 2, y))];
+  const hit = (x, y) => placed.some((r) => x < r[0] + r[2] + 2 && x + w + 2 > r[0] && y < r[1] + r[3] + 2 && y + h + 2 > r[1]);
+  let best = null, anchor = null;
+  outer: for (const [k, e] of ends.entries()) for (const [dx, dy] of [[8, -h / 2], [-w - 8, -h / 2], [-w / 2, -h - 10], [-w / 2, 10], [8, -h - 10], [-w - 8, 10], [8, 10], [-w - 8, -h - 10]]) {
+    const [x, y] = clamp(TF.x(e[0]) + dx, TF.y(e[1]) + dy); if (!best) { best = [x, y]; anchor = e; } if (!hit(x, y)) { best = [x, y]; anchor = e; break outer; } }
+  const [x, y] = best; placed.push([x, y, w, h]);
+  g.strokeStyle = c; g.lineWidth = 1; g.beginPath(); g.moveTo(TF.x(anchor[0]), TF.y(anchor[1])); g.lineTo(Math.max(x, Math.min(x + w, TF.x(anchor[0]))), Math.max(y, Math.min(y + h, TF.y(anchor[1])))); g.stroke();
+  g.fillStyle = on ? css("--accent") : "rgba(255,255,255,.94)"; g.strokeStyle = c; g.lineWidth = 1.4; g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, 4) : g.rect(x, y, w, h); g.fill(); g.stroke();
+  g.fillStyle = on ? css("--accent-ink") : "#111"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(tx, x + 4, y + h / 2 + 0.5);
+}
+const S = { layer: "relief", tracks: true, targets: true, st: true, sel: "L1", prop: "rho", lrho: 2.5, loop: "plan", cur: 10, noise: 1e-8, f: 10 };
 
 // ---------------------------------------------------------------- helpers
 function lonlat(e, n) { const u = (e - D.ll.e0) / 1e4, v = (n - D.ll.n0) / 1e4, b = [1, u, v, u * u, u * v, v * v];
@@ -200,8 +241,15 @@ function renderStats() {
 
 // ---------------------------------------------------------------- map
 const overlays = {};
+const ZCOL = [[214, 226, 196], [222, 214, 168], [212, 182, 128], [186, 140, 96], [150, 110, 84], [210, 200, 192]];
+const ZMAX = Math.max(...Z200);
 function overlay(kind) {
   if (overlays[kind]) return overlays[kind];
+  if (kind === "relief") {
+    const c = document.createElement("canvas"); c.width = T.nx200; c.height = T.ny200; const g = c.getContext("2d"), im = g.createImageData(T.nx200, T.ny200);
+    for (let i = 0; i < Z200.length; i++) { if (Z200[i] <= 0) { im.data.set([150, 190, 225, 170], 4 * i); continue; } const c3 = ramp(ZCOL, Z200[i] / ZMAX); im.data.set([c3[0], c3[1], c3[2], 150], 4 * i); }
+    g.putImageData(im, 0, 0); return (overlays[kind] = c);
+  }
   const c = document.createElement("canvas"); c.width = GR.nx; c.height = GR.ny; const g = c.getContext("2d"), im = g.createImageData(GR.nx, GR.ny);
   const arr = kind === "grav" ? GRAV : RTP, sc = kind === "grav" ? 100 * GR.grav_lim : GR.rtp_lim;
   for (let i = 0; i < arr.length; i++) { if (arr[i] === -32768) continue; const c3 = ramp(RDBU, (arr[i] / sc + 1) / 2); im.data.set([c3[0], c3[1], c3[2], 205], 4 * i); }
@@ -214,7 +262,7 @@ function drawMap() {
   TF = { ml, mt, pw, ph, x: (e) => ml + (e - T.x0) / (T.x1 - T.x0) * pw, y: (n) => mt + (T.y1 - n) / (T.y1 - T.y0) * ph, e: (px) => T.x0 + (px - ml) / pw * (T.x1 - T.x0), n: (py) => T.y1 - (py - mt) / ph * (T.y1 - T.y0) };
   g.fillStyle = css("--soft"); g.fillRect(ml, mt, pw, ph);
   if (HILL.complete && HILL.naturalWidth) g.drawImage(HILL, ml, mt, pw, ph);
-  if (S.layer !== "relief") { g.imageSmoothingEnabled = true; g.drawImage(overlay(S.layer), ml, mt, pw, ph); }
+  g.imageSmoothingEnabled = true; g.drawImage(overlay(S.layer), ml, mt, pw, ph);
   if (S.tracks) { g.fillStyle = "rgba(30,30,30,.55)"; for (const p of D.tracks.gravity) { g.fillRect(TF.x(p[0]) - 0.8, TF.y(p[1]) - 0.8, 1.6, 1.6); } }
   if (S.targets) for (const t of D.targets) {
     g.beginPath(); t.hull.forEach((p, i) => (i ? g.lineTo(TF.x(p[0]), TF.y(p[1])) : g.moveTo(TF.x(p[0]), TF.y(p[1])))); g.closePath();
@@ -222,15 +270,16 @@ function drawMap() {
     g.font = "600 11px " + css("--mono"); g.fillStyle = KCOL[t.kind]; g.textAlign = "center"; g.textBaseline = "middle";
     const hx = Math.max(...t.hull.map((p) => p[0])), hy = Math.max(...t.hull.map((p) => p[1])); g.fillText(t.id, TF.x(hx) + 10, TF.y(hy) - 6);
   }
+  const pending = [], placed = [];
   for (const ln of LINES) {
     const on = ln.id === S.sel, c = lineColour(ln);
-    g.lineCap = "round"; g.strokeStyle = "#fff"; g.lineWidth = on ? 8 : 5; g.beginPath(); g.moveTo(TF.x(ln.a[0]), TF.y(ln.a[1])); g.lineTo(TF.x(ln.b[0]), TF.y(ln.b[1])); g.stroke();
-    g.strokeStyle = on ? css("--accent") : c; g.lineWidth = on ? 4.5 : 2.5; g.stroke();
+    g.lineCap = "round"; g.strokeStyle = "#fff"; g.lineWidth = on ? 9 : 6; g.beginPath(); g.moveTo(TF.x(ln.a[0]), TF.y(ln.a[1])); g.lineTo(TF.x(ln.b[0]), TF.y(ln.b[1])); g.stroke();
+    g.setLineDash(ln.priority === "1" ? [] : [9, 5]); g.strokeStyle = on ? css("--accent") : c; g.lineWidth = on ? 5 : 3.2; g.stroke(); g.setLineDash([]);
     if (S.st) for (let i = 0; i < NST; i++) if (ST.line[i] === ln.id) { g.fillStyle = ST.method[i] === "AMT" ? css("--amt") : css("--tem"); const x = TF.x(ST.easting[i]), y = TF.y(ST.northing[i]);
       if (ST.method[i] === "AMT") { g.beginPath(); g.moveTo(x, y - 3.5); g.lineTo(x + 3.5, y); g.lineTo(x, y + 3.5); g.lineTo(x - 3.5, y); g.fill(); } else { g.beginPath(); g.arc(x, y, on ? 2.4 : 1.7, 0, 7); g.fill(); } }
-    g.font = "700 12px " + css("--mono"); g.textAlign = "left"; g.textBaseline = "bottom"; g.lineWidth = 3; g.strokeStyle = "#fff";
-    g.strokeText(ln.id, TF.x(ln.b[0]) + 5, TF.y(ln.b[1]) - 3); g.fillStyle = on ? css("--accent") : c; g.fillText(ln.id, TF.x(ln.b[0]) + 5, TF.y(ln.b[1]) - 3);
+    pending.push([ln, on, c]);
   }
+  pending.sort((p, q) => (p[0].id === S.sel) - (q[0].id === S.sel)).reverse().forEach(([ln, on, c]) => labelLine(g, ln, on, c, placed));
   // axes
   const mu = css("--muted"); g.fillStyle = mu; g.strokeStyle = mu; g.font = "11px " + css("--mono"); g.textAlign = "center"; g.textBaseline = "top";
   for (let e = Math.ceil(T.x0 / 5000) * 5000; e <= T.x1; e += 5000) { g.beginPath(); g.moveTo(TF.x(e), mt + ph); g.lineTo(TF.x(e), mt + ph + 4); g.stroke(); g.fillText((e / 1000).toFixed(0), TF.x(e), mt + ph + 6); }
@@ -238,9 +287,9 @@ function drawMap() {
   for (let n = Math.ceil(T.y0 / 5000) * 5000; n <= T.y1; n += 5000) { g.beginPath(); g.moveTo(ml - 4, TF.y(n)); g.lineTo(ml, TF.y(n)); g.stroke(); g.fillText((n / 1000).toFixed(0), ml - 6, TF.y(n)); }
   g.strokeStyle = css("--line"); g.strokeRect(ml + 0.5, mt + 0.5, pw, ph);
   const lim = S.layer === "grav" ? `±${GR.grav_lim.toFixed(1)} mGal` : S.layer === "rtp" ? `±${Math.round(GR.rtp_lim)} nT` : "";
-  $("#legend-map").innerHTML = `<span class="chip tem">● TEM station</span><span class="chip amt">◆ AMT station</span>` +
+  $("#legend-map").innerHTML = `<span class="chip tem">━ TEM line</span><span class="chip" style="color:#8e44ad;border-color:#8e44ad">━ TEM + AMT line</span><span class="chip amt">━ AMT line</span><span class="chip">solid: priority 1 · dashed: priority 2</span><span class="chip tem">● TEM station</span><span class="chip amt">◆ AMT station</span>` +
     Object.entries(KCOL).map(([k, c]) => `<span class="chip" style="color:${c};border-color:${c}">${k} body</span>`).join("") +
-    (lim ? `<span class="sub">colours: blue − / red + , ${lim}</span>` : "");
+    (lim ? `<span class="sub">colours: blue − / red + , ${lim}</span>` : `<span class="sub" style="display:inline-flex;align-items:center;gap:6px">elevation 0 <span style="display:inline-block;width:110px;height:10px;border-radius:3px;background:linear-gradient(90deg,${ZCOL.map((c) => `rgb(${c})`).join(",")})"></span> ${ZMAX} m</span>`);
 }
 function segDist(px, py, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(px - ax - t * dx, py - ay - t * dy); }
 function inPoly(x, y, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
@@ -277,7 +326,7 @@ function renderCard() {
     <dt>Start (west)</dt><dd>${la1.toFixed(5)}° N, ${lo1.toFixed(5)}° E</dd><dt>End</dt><dd>${la2.toFixed(5)}° N, ${lo2.toFixed(5)}° E</dd>`;
   if (L) h += `<dt>TEM sees to</dt><dd>~${Math.round(temDoi(L, r))} m at ${fmtRho(r)}</dd>`;
   if (ln.n_amt) h += `<dt>AMT sees to</dt><dd>~${Math.round(amtDoi(r, S.f))} m at ${fmtRho(r)}</dd>`;
-  h += "</dl>";
+  h += `</dl><div class="k" style="margin-top:2px">Topography along the line</div><canvas id="cv-prof" aria-label="Elevation profile"></canvas><div class="readout" id="prof-stats"></div>`;
   if (t) h += `<div class="phead" style="margin-top:4px"><h2 style="color:${KCOL[t.kind]}">Target ${t.id} · ${t.kind}</h2></div>
     <dl class="kv"><dt>Depth to top</dt><dd>${t.top_depth < 100 ? "< 100 m (near surface)" : "≈ " + Math.round(t.top_depth) + " m"}</dd><dt>Depth to centre</dt><dd>≈ ${Math.round(t.centre_depth)} m</dd>
     <dt>Base</dt><dd>${t.bottom_elev > -2300 ? Math.round(t.bottom_elev) + " m elevation" : "below −2.4 km (not resolved)"}</dd>
@@ -287,6 +336,33 @@ function renderCard() {
   h += `<div class="lines">${LINES.map((l) => `<button data-id="${l.id}" aria-pressed="${l.id === S.sel}"><span class="dot" style="background:${l.target in TARGETS ? KCOL[TARGETS[l.target].kind] : lineColour(l)}"></span>${l.id}</button>`).join("")}</div>`;
   $("#card").innerHTML = h;
   $("#card").querySelectorAll(".lines button").forEach((b) => b.addEventListener("click", () => select(b.dataset.id)));
+  drawProfile();
+}
+
+
+// ---------------------------------------------------------------- topography profile of the selected line
+function profileOf(ln, step = 50) {
+  const n = Math.max(2, Math.round(ln.length_m / step)), d = [], z = [];
+  for (let i = 0; i <= n; i++) { const t = i / n; d.push(t * ln.length_m); z.push(terrainZ(ln.a[0] + t * (ln.b[0] - ln.a[0]), ln.a[1] + t * (ln.b[1] - ln.a[1]))); }
+  return { d, z };
+}
+function drawProfile() {
+  const cv = $("#cv-prof"); if (!cv) return;
+  const ln = sel(), { d, z } = profileOf(ln), w = cv.clientWidth || 300, H = 120, { g } = fitCanvas(cv, H), ml = 44, mr = 8, mt = 8, mb = 24, pw = w - ml - mr, ph = H - mt - mb;
+  const zmin = Math.min(...z), zmax = Math.max(...z), pad = Math.max(20, (zmax - zmin) * 0.15), lo = Math.max(0, zmin - pad), hi = zmax + pad;
+  const X = (v) => ml + v / ln.length_m * pw, Y = (v) => mt + ph - (v - lo) / (hi - lo) * ph;
+  g.fillStyle = css("--soft"); g.fillRect(ml, mt, pw, ph);
+  g.beginPath(); g.moveTo(X(0), Y(lo)); d.forEach((x, i) => g.lineTo(X(x), Y(z[i]))); g.lineTo(X(ln.length_m), Y(lo)); g.closePath();
+  g.fillStyle = "rgba(150,120,80,.45)"; g.fill(); g.strokeStyle = css("--ink"); g.lineWidth = 1.5; g.beginPath(); d.forEach((x, i) => (i ? g.lineTo(X(x), Y(z[i])) : g.moveTo(X(x), Y(z[i])))); g.stroke();
+  for (let i = 0; i < NST; i++) if (ST.line[i] === ln.id) { g.fillStyle = ST.method[i] === "AMT" ? css("--amt") : css("--tem"); g.beginPath(); g.arc(X(ST.distance_m[i]), Y(terrainZ(ST.easting[i], ST.northing[i])), 2, 0, 7); g.fill(); }
+  const mu = css("--muted"); g.fillStyle = mu; g.font = "10.5px " + css("--mono"); g.textAlign = "right"; g.textBaseline = "middle";
+  [lo, (lo + hi) / 2, hi].forEach((v) => g.fillText(Math.round(v) + " m", ml - 4, Y(v)));
+  g.textAlign = "center"; g.textBaseline = "top"; const st = niceStep(ln.length_m, 5);
+  for (let x = 0; x <= ln.length_m + 1; x += st) g.fillText((x / 1000).toFixed(st < 1000 ? 1 : 0), X(x), mt + ph + 4);
+  g.textAlign = "right"; g.fillText("km", ml + pw, mt + ph + 4); g.strokeStyle = css("--line"); g.strokeRect(ml + 0.5, mt + 0.5, pw, ph);
+  let smax = 0, climb = 0; for (let i = 1; i < z.length; i++) { const dz = z[i] - z[i - 1]; smax = Math.max(smax, Math.abs(dz) / (d[i] - d[i - 1])); if (dz > 0) climb += dz; }
+  $("#prof-stats").textContent = `${Math.round(zmin)}–${Math.round(zmax)} m a.s.l. · relief ${Math.round(zmax - zmin)} m · total climb ${Math.round(climb)} m · steepest ${(Math.atan(smax) * 180 / Math.PI).toFixed(0)}° (200 m DEM)` +
+    (Math.atan(smax) * 180 / Math.PI > 15 ? " · steep: lay loops on the flatter parts" : "");
 }
 
 // ---------------------------------------------------------------- section
@@ -347,6 +423,22 @@ $("#cv-sec").addEventListener("pointermove", (ev) => {
   let v = "air"; if (k >= 0) { const qr = s.rho[k * s.n + i], qc = s.chi[k * s.n + i]; if (qr !== -128) v = `Δρ ${(qr / 127 * 0.3 >= 0 ? "+" : "")}${(qr / 127 * 0.3).toFixed(3)} g/cm³ · χ ${(qc / 127 * 0.3).toFixed(4)} SI`; }
   $("#ro-sec").textContent = `${(d / 1000).toFixed(2)} km · ${Math.round(z)} m elevation (${Math.max(0, Math.round(zs - z))} m below surface) · ${v}`;
 });
+
+
+// ---------------------------------------------------------------- H2 roles of the targets
+function h2Role(t) {
+  if (t.kind === "magnetic" && t.other_mean <= -0.02) return ["Serpentinised ultramafic (light and magnetic)", "Possible H2 source. Is it wet and fractured (active, 10–100 Ωm) or dry and massive (spent)?"];
+  if (t.kind === "magnetic" && t.other_mean >= 0.02) return ["Partly serpentinised peridotite or magnetite-rich gabbro (dense and magnetic)", "Possible active serpentinisation front: look for conductive fluid zones and IP response at its margins."];
+  if (t.kind === "magnetic") return ["Magnetic, density neutral", "Serpentinite mixed with denser rock, or magnetite-rich mafic rock: resistivity and IP separate the two."];
+  if (t.kind === "dense") return ["Dense, weakly magnetic: fresh mafic or ultramafic rock", "H2 source only if water reaches it: AMT and TEM look for conductive fluid paths into it."];
+  return ["Low density near the coast: sedimentary basin", "Reservoir and seal: EM maps the depth to basement, brines and resistive evaporite seals."];
+}
+function renderH2() {
+  const lineOf = (id) => LINES.find((l) => l.target === id)?.id || "";
+  $("#tbl-h2t").innerHTML = "<thead><tr><th>Target</th><th>Line</th><th>Body</th><th>Mean Δρ / peak χ</th><th>Interpretation</th><th>What EM must answer</th></tr></thead><tbody>" +
+    D.targets.map((t) => { const [what, ask] = h2Role(t);
+      return `<tr><td style="color:${KCOL[t.kind]};font-weight:600">${t.id}</td><td>${lineOf(t.id)}</td><td>${t.kind}</td><td>${t.kind === "magnetic" ? (t.other_mean >= 0 ? "+" : "") + t.other_mean.toFixed(3) + " / " + t.peak.toFixed(2) + " SI" : (t.peak > 0 ? "+" : "") + t.peak.toFixed(2) + " g/cm³"}</td><td style="text-align:left;font-family:var(--body)">${what}</td><td style="text-align:left;font-family:var(--body)">${ask}</td></tr>`; }).join("") + "</tbody>";
+}
 
 // ---------------------------------------------------------------- charts
 function axes(g, ml, mt, pw, ph, xt, yt, xl, yl) {
@@ -419,5 +511,5 @@ let rt = 0; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(redraw,
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", redraw);
 new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 try { const s = localStorage.getItem("wgem-line"); if (s && LINES.some((l) => l.id === s)) S.sel = s; } catch (e) { /* storage unavailable */ }
-renderStats(); $("#lab-rho").textContent = fmtRho(rhoHost()); select(S.sel); drawDoi(); drawRes();
+renderStats(); renderH2(); $("#lab-rho").textContent = fmtRho(rhoHost()); select(S.sel); drawDoi(); drawRes();
 </script>
