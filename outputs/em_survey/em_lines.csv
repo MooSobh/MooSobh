@@ -1,0 +1,10 @@
+# Wadi Ghadir EM survey design, written by Mohamed Sobh, LIAG. UTM 36N / WGS 84.
+line,target,priority,method,loop_m,tem_spacing_m,amt_spacing_m,length_km,tem_stations,amt_stations,start_lon,start_lat,end_lon,end_lat,purpose
+L1,T1,1,TEM central loop,100,50,0,3.17,64,0,34.776941,24.708613,34.79879,24.688125,magnetic body T1: contacts and conductive zones
+L2,T2,1,TEM central loop,100,50,0,2.0,41,0,34.742468,24.717944,34.756265,24.705015,magnetic body T2: contacts and conductive zones
+L3,T3,2,TEM + AMT,400,100,250,4.0,41,17,34.860271,24.748443,34.884207,24.777187,dense body T3: contacts and conductive zones
+L4,T4,2,TEM + AMT,400,100,250,3.0,31,13,34.888799,24.767879,34.896181,24.794126,magnetic body T4: contacts and conductive zones
+L5,T5,1,TEM central loop,100,50,0,3.13,63,0,34.934697,24.788799,34.943475,24.761713,magnetic body T5: contacts and conductive zones
+L6,T6,1,TEM central loop,100,50,0,3.17,64,0,34.98348,24.822958,35.0134,24.831506,light body T6: contacts and conductive zones
+P1,regional,2,AMT,0,0,500,23.75,0,48,34.7448,24.7058,34.949,24.8117,regional AMT traverse along A-B (notebook 04): structure to 1-3 km
+R1,reference,1,TEM central loop,200,100,0,1.5,16,0,34.905692,24.760132,34.92052,24.759943,reference line over a quiet area: background resistivity
