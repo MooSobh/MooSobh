@@ -1,9 +1,7 @@
 # Wadi Ghadir one-week EM campaign, written by Mohamed Sobh, LIAG. UTM 36N / WGS 84.
 order,line,priority,method,loop_m,tem_step_m,amt_step_m,length_km,tem_stations,amt_stations,days,why
 1,R1,1,TEM central loop,200,100/100,,1.0,11,0,1-1,background resistivity and noise level: calibrates every other line
-2,L2,1,TEM + AMT,100,50/100,500,2.0,31,5,1-3,"strongest magnetic anomaly, dense and magnetic: possible active serpentinisation front (H2 source)"
-3,L1,1,TEM + AMT,100,50/100,500,2.4,35,5,2-4,shallow magnetic body with a dense and magnetic core: H2 source candidate
-4,L4,1,TEM + AMT,400,200/200,250,3.0,16,13,3-5,deep magnetic body (top ~700 m) and its faults: source at depth and pathways
-5,L5,2,TEM central loop,100,50/100,,2.0,31,0,6-7,shallow magnetic body in the east: serpentinite or magnetite-rich mafic rock
-6,L6,2,TEM central loop,100,100/100,,2.0,21,0,7-7,low-density body at the coast: reservoir and seal side of the H2 system
-7,L3,2,AMT,0,,250,4.0,0,17,5-7,"deep dense block (top ~1.1 km): AMT only, fluid paths into it"
+2,L1,1,TEM + AMT,100,50/100,500,2.5000000000000178,37,6,1-3,"serpentinite candidate S1: Δρ -0.10 g/cm³, χ 0.134 SI, top ≈ 0 m, centre ≈ 321 m, 3 of 3 models agree"
+3,L2,1,TEM + AMT,200,100/100,250,3.9999999999999463,40,17,2-5,"serpentinite candidate S2: Δρ -0.14 g/cm³, χ 0.024 SI, top ≈ 200 m, centre ≈ 1160 m, 2 of 3 models agree"
+4,L3,1,TEM + AMT,100,50/100,250,2.499999999999959,36,11,5-6,"serpentinite candidate S3: Δρ -0.02 g/cm³, χ 0.006 SI, top ≈ 0 m, centre ≈ 1138 m, 3 of 3 models agree"
+5,A1,2,TEM central loop,100,200/200,,3.9999999999997424,20,0,6-7,"along the serpentinite belt S2 (gravity -5.1 mGal, RTP 840 nT): lateral continuity of water and alteration"

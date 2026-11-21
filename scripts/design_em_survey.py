@@ -151,6 +151,107 @@ def find_targets(mesh, act, rho, chi, g, m):
     return chosen, far, surf
 
 
+H2_RHO_T, H2_CHI_T = -0.02, 0.005   # light and magnetic: the joint classification thresholds of notebook 08
+H2_N = 5                             # serpentinite targets
+H2_PEAK_SEP_M = 2400.0
+
+
+def find_h2_targets(mesh, act, rho, chi, g, m):
+    """Serpentinite candidates for natural hydrogen: low density and high susceptibility together.
+
+    Each cell scores by how many of three models (joint compact, separate compact, separate smooth) call it light
+    and magnetic, times its mean density deficit and susceptibility. The score is summed down each column with a
+    depth weight; peaks of this map, at least H2_PEAK_SEP_M apart, are the targets."""
+    from scipy import ndimage
+    gg = dict(np.load(os.path.join(INV, "gravity_model.npz")))
+    mm = dict(np.load(os.path.join(INV, "magnetic_model.npz")))
+    shp = mesh.shape_cells
+    as3 = lambda v: np.nan_to_num(v.reshape(shp, order="F"))  # noqa: E731
+    models = [(as3(rho), as3(chi)),
+              (as3(W.model_on_mesh(mesh, act, gg["rho_gcc"])), as3(W.model_on_mesh(mesh, act, mm["chi_SI"]))),
+              (as3(W.model_on_mesh(mesh, act, gg["rho_smooth_gcc"])), as3(W.model_on_mesh(mesh, act, mm["chi_smooth_SI"])))]
+    A = act.reshape(shp, order="F")
+    xc, yc, zc = mesh.cell_centers_x, mesh.cell_centers_y, mesh.cell_centers_z
+    nx, ny, nz = shp
+    far = (W.far_from_data(xc, yc, g["data_xyz"][:, 0], g["data_xyz"][:, 1], MASK_M)
+           | W.far_from_data(xc, yc, m["data_xyz"][:, 0], m["data_xyz"][:, 1], MASK_M)).T
+    core = np.zeros((nx, ny), bool)
+    core[6:-6, 6:-6] = True
+    keep = A & (~far & core)[:, :, None] & (zc >= ZMIN)[None, None, :]
+    votes = sum(((r <= H2_RHO_T) & (c >= H2_CHI_T)).astype(int) for r, c in models) * keep
+    rbar = np.mean([r for r, _ in models], axis=0)
+    cbar = np.mean([c for _, c in models], axis=0)
+    surf = np.array([[zc[A[i, j]].max() + mesh.h[2][A[i, j]][-1] / 2 if A[i, j].any() else np.nan for j in range(ny)] for i in range(nx)])
+    depth = surf[:, :, None] - zc[None, None, :]
+    cell = votes * np.clip(-rbar / 0.05, 0, 4) * np.clip(cbar / 0.01, 0, 10) * (votes > 0)
+    colscore = (cell * mesh.h[2][None, None, :] / (1 + np.clip(depth, 0, None) / 800)).sum(axis=2)
+    # the same signature in the data: residual Bouguer low and RTP high (columns, smoothed over ~1 km)
+    from scipy.interpolate import griddata
+    from scipy.spatial import cKDTree
+    X, Y = np.meshgrid(xc, yc, indexing="ij")
+    G = griddata(g["data_xyz"][:, :2], g["data_mgal"], (X, Y), method="linear")
+    rtp = pd.read_csv(os.path.join(ROOT, "outputs", "grids", "mag_rtp_xyz.csv")).dropna()
+    dist, idx = cKDTree(rtp[["easting_utm36n", "northing_utm36n"]].values).query(np.c_[X.ravel(), Y.ravel()])
+    Rm = np.where(dist < 300, rtp["rtp_nT"].values[idx], np.nan).reshape(X.shape)
+    Gs = ndimage.gaussian_filter(np.nan_to_num(G), 1.0)
+    Rs = ndimage.gaussian_filter(np.nan_to_num(Rm), 1.0)
+    data_idx = np.clip(-Gs / 1.5, 0, 3) * np.clip(Rs / 150, 0, 5) * ~far * core
+    model_idx = ndimage.gaussian_filter(colscore, 1.0)
+    sm = model_idx / max(model_idx.max(), 1e-12) + data_idx / max(data_idx.max(), 1e-12)
+    sm[data_idx <= 0] *= 0.25                         # the data must show the gravity low and the magnetic high
+    peaks = (sm == ndimage.maximum_filter(sm, size=5)) & (sm > 0.05 * sm.max()) & (data_idx > 0)
+    cand = sorted(zip(*np.nonzero(peaks)), key=lambda ij: -sm[ij])
+    chosen = []
+    for i, j in cand:
+        if any(np.hypot(xc[i] - t["pe"], yc[j] - t["pn"]) < H2_PEAK_SEP_M for t in chosen):
+            continue
+        lab, _ = ndimage.label(sm >= 0.3 * sm[i, j])
+        foot = (lab == lab[i, j]) & (np.hypot(X - xc[i], Y - yc[j]) < 2500)
+        ii, jj = np.nonzero(foot)
+        sub = cell[ii, jj, :]
+        if sub.sum() <= 0:                                # the data show it, the models put it deeper or weaker: use their average
+            sub = np.clip(-rbar[ii, jj, :] / 0.05, 0, 4) * np.clip(cbar[ii, jj, :] / 0.01, 0, 10) * keep[ii, jj, :]
+        if sub.sum() <= 0:
+            continue
+        k_any = sub > 0
+        tops = [depth[a, b, np.nonzero(k_any[q])[0]].min() for q, (a, b) in enumerate(zip(ii, jj)) if k_any[q].any()]
+        w = sub[k_any]
+        kk = np.nonzero(k_any)
+        dd = depth[ii[kk[0]], jj[kk[0]], kk[1]]
+        zz = zc[kk[1]]
+        pts = np.c_[xc[ii], yc[jj]]
+        wcol = colscore[ii, jj] + 1e-12
+        if len(pts) >= 3:
+            cov = np.cov(pts.T, aweights=wcol)
+            ev, evec = np.linalg.eigh(cov)
+            strike = evec[:, 1] if ev[1] > 1.5 * ev[0] else np.array([np.sin(np.radians(45)), np.cos(np.radians(45))])
+            width = 4 * np.sqrt(max(ev[0], 0)) + 400
+        else:
+            strike, width = np.array([np.sin(np.radians(45)), np.cos(np.radians(45))]), 400.0
+        vv = votes[ii[kk[0]], jj[kk[0]], kk[1]]
+        ce, cn = float(np.average(xc[ii], weights=wcol)), float(np.average(yc[jj], weights=wcol))
+        if any(np.hypot(ce - t["e"], cn - t["n"]) < 0.75 * H2_PEAK_SEP_M for t in chosen):
+            continue                                      # the same body seen from another peak
+        order = np.argsort(dd)
+        top = float(dd[order][np.searchsorted(np.cumsum(w[order]) / w.sum(), 0.1)])   # 10 % of the signature lies above
+        chosen.append(dict(kind="serpentinite", e=ce, n=cn, pe=float(xc[i]), pn=float(yc[j]),
+                           top_elev=float(zz.max() + 50), bottom_elev=float(zz.min() - 50), top_depth=max(0.0, top - 50),
+                           centre_depth=float(np.average(dd, weights=w)), peak=float(np.average(cbar[ii[kk[0]], jj[kk[0]], kk[1]], weights=w)),
+                           other_mean=float(np.average(rbar[ii[kk[0]], jj[kk[0]], kk[1]], weights=w)), dense_magnetic_share=0.0,
+                           agree=int(vv.max()), agree_share=float(np.average(vv, weights=w) / 3), volume_km3=float(np.sum(k_any) * 0.016),
+                           cells=int(np.sum(k_any)), strike=strike, width=width, footprint=pts, score=float(sm[i, j]),
+                           g_mgal=float(Gs[i, j]), rtp_nT=float(Rs[i, j])))
+        if len(chosen) == 2 * H2_N:
+            break
+    # rank for an EM campaign: signature strength, agreement between the models, and reach (shallow first)
+    for t in chosen:
+        t["rank"] = t["score"] * (0.5 + t["agree_share"]) / (1 + t["centre_depth"] / 1000)
+    chosen = sorted(chosen, key=lambda t: -t["rank"])[:H2_N]
+    for k, t in enumerate(chosen, 1):
+        t["id"] = f"S{k}"
+    return chosen, far, surf
+
+
 def quiet_site(mesh, act, rho, chi, far, avoid):
     """Centre of the quietest constrained column (small |drho| and chi throughout), away from the targets."""
     R, C, A = (a.reshape(mesh.shape_cells, order="F") for a in (rho, chi, act))
@@ -168,19 +269,58 @@ def quiet_site(mesh, act, rho, chi, far, avoid):
     return xc[i], yc[j]
 
 
+REGION = None    # core of the mesh (west, east, south, north), set by compute()
+
+
+def keep_inside(a, b, region, inset=400.0):
+    """Shift a line along itself so both ends lie inside the region (then trim if it is still too long)."""
+    w, e, s_, n = region[0] + inset, region[1] - inset, region[2] + inset, region[3] - inset
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    L = float(np.hypot(*(b - a)))
+    u = (b - a) / L
+
+    def interval(p):
+        lo, hi = -np.inf, np.inf
+        for k, (mn, mx) in enumerate(((w, e), (s_, n))):
+            if abs(u[k]) < 1e-12:
+                if not mn <= p[k] <= mx:
+                    return 1.0, 0.0
+                continue
+            t1, t2 = (mn - p[k]) / u[k], (mx - p[k]) / u[k]
+            lo, hi = max(lo, min(t1, t2)), min(hi, max(t1, t2))
+        return lo, hi
+    lo, hi = interval(a)                       # allowed positions along the line, measured from a
+    shift = lo if lo > 0 else (hi - L if hi < L else 0.0)
+    a, b = a + u * shift, b + u * shift
+    lo, hi = interval(a)
+    t0, t1 = max(0.0, lo), min(L, hi)
+    return a + u * t0, a + u * t1
+
+
 def make_lines(targets, ref, region):
     w, e, s, n = region
     lines = []
     for t in targets:
         cfg = method_for(t["top_depth"])
         across = np.array([t["strike"][1], -t["strike"][0]])          # perpendicular to strike
-        L = float(np.clip(t["width"] + 2 * 800, 2000, 4000))
+        L = float(np.clip(t["width"] + 2 * 1000, 2500, 4000))                # cross both contacts by ~1 km
         a = np.array([t["e"], t["n"]]) - across * L / 2
         b = np.array([t["e"], t["n"]]) + across * L / 2
         if across[0] < 0 or (abs(across[0]) < 1e-9 and across[1] < 0):
             a, b = b, a                                               # start in the west
+        a, b = keep_inside(a, b, region)
         lines.append(dict(id=f"L{t['id'][1:]}", target=t["id"], a=a, b=b, **cfg, priority="",
-                          purpose=f"{t['kind']} body {t['id']}: contacts and conductive zones"))
+                          purpose=(f"serpentinite candidate {t['id']} (Δρ {t['other_mean']:+.2f} g/cm³, χ {t['peak']:.3f} SI): water, alteration and faults"
+                                   if t["kind"] == "serpentinite" else f"{t['kind']} body {t['id']}: contacts and conductive zones")))
+    belt = max((t for t in targets if t["kind"] == "serpentinite"), key=lambda t: -t.get("g_mgal", 0) * t.get("rtp_nT", 0), default=None)
+    if belt is not None:                                              # along the strongest serpentinite belt
+        u = np.asarray(belt["strike"], float)
+        a, b = np.array([belt["e"], belt["n"]]) - u * 2000, np.array([belt["e"], belt["n"]]) + u * 2000
+        if u[1] < 0:
+            a, b = b, a                                               # start in the south
+        a, b = keep_inside(a, b, region)
+        lines.append(dict(id="A1", target=belt["id"], a=a, b=b, method="TEM central loop", loop_m=100, spacing_m=200, amt_spacing_m=0,
+                          priority="", purpose=f"along the serpentinite belt {belt['id']}: lateral continuity of water and alteration"))
     ea, na = W.to_utm(*SECTION_AB[0])
     eb, nb = W.to_utm(*SECTION_AB[1])
     lines.append(dict(id="P1", target="regional", a=np.array([float(ea), float(na)]), b=np.array([float(eb), float(nb)]),
@@ -259,7 +399,7 @@ def plan_map(ax_g, ax_m, targets, lines, st, g, m):
     im1 = ax_g.pcolormesh(km(xs), km(ys), G, cmap="RdBu_r", vmin=-v, vmax=v, shading="auto", rasterized=True)
     vm = np.nanpercentile(np.abs(Mg), 98)
     im2 = ax_m.pcolormesh(km(xs), km(ys), Mg, cmap="RdBu_r", vmin=-vm, vmax=vm, shading="auto", rasterized=True)
-    col = {"magnetic": "#6a1b9a", "dense": "#b71c1c", "light": "#0d47a1"}
+    col = {"magnetic": "#6a1b9a", "dense": "#b71c1c", "light": "#0d47a1", "serpentinite": "#00796b"}
     for ax, im, lab in ((ax_g, im1, "residual Bouguer anomaly [mGal]"), (ax_m, im2, "RTP magnetic anomaly [nT]")):
         ax.plot(km(g["data_xyz"][:, 0]), km(g["data_xyz"][:, 1]), ".", ms=1.2, color="0.35", zorder=2)
         for tg in targets:
@@ -326,15 +466,17 @@ def draw_sections(fig, lines, targets, mesh, rho, chi):
 def compute():
     """Targets, lines and stations of the EM survey (used by the plan sheets and the interactive page)."""
     mesh, act, rho, chi, g, m = load()
-    targets, far, surf = find_targets(mesh, act, rho, chi, g, m)
+    targets, far, surf = find_h2_targets(mesh, act, rho, chi, g, m)
     ref = quiet_site(mesh, act, rho, chi, far, targets)
+    global REGION
     region = (mesh.nodes_x[5], mesh.nodes_x[-6], mesh.nodes_y[5], mesh.nodes_y[-6])
+    REGION = region
     lines = make_lines(targets, ref, region)
     st = stations(lines, g["data_xyz"], m["data_xyz"])
     # priorities: shallow, contrasted bodies first; dense + magnetic overlap raises it
     for ln in lines:
         t = next((t for t in targets if t["id"] == ln["target"]), None)
-        ln["priority"] = ("1" if t["top_depth"] < 300 or t["dense_magnetic_share"] > 0.3 else "2") if t else ("1" if ln["id"] == "R1" else "2")
+        ln["priority"] = ("1" if targets.index(t) < 3 and ln["id"][0] == "L" else "2") if t else ("1" if ln["id"] == "R1" else "2")
     for k, ln in enumerate(lines):
         ln["n_tem"] = int((st.line == ln["id"]).sum() - ((st.line == ln["id"]) & (st.method == "AMT")).sum())
         ln["n_amt"] = int(((st.line == ln["id"]) & (st.method == "AMT")).sum())
@@ -348,35 +490,60 @@ TEM_RATE = {100: 30, 200: 22, 400: 12}   # TEM soundings per day by loop side (m
 AMT_RATE = 7                             # AMT soundings per day (one crew, two or three systems leap-frogging)
 FIRST_DAY = 0.6                          # share of day 1 left after mobilisation and instrument tests
 MOVE_DAYS = 0.15                         # moving to another line
-# line, priority, length [km], TEM loop [m], TEM step over the target / outside [m], AMT step [m], why
-WEEK = [
-    ("R1", "1", 1.0, 200, 100, 100, 0, "background resistivity and noise level: calibrates every other line"),
-    ("L2", "1", 2.0, 100, 50, 100, 500, "strongest magnetic anomaly, dense and magnetic: possible active serpentinisation front (H2 source)"),
-    ("L1", "1", 2.4, 100, 50, 100, 500, "shallow magnetic body with a dense and magnetic core: H2 source candidate"),
-    ("L4", "1", 3.0, 400, 200, 200, 250, "deep magnetic body (top ~700 m) and its faults: source at depth and pathways"),
-    ("L5", "2", 2.0, 100, 50, 100, 0, "shallow magnetic body in the east: serpentinite or magnetite-rich mafic rock"),
-    ("L6", "2", 2.0, 100, 100, 100, 0, "low-density body at the coast: reservoir and seal side of the H2 system"),
-    ("L3", "2", 4.0, 0, 0, 0, 250, "deep dense block (top ~1.1 km): AMT only, fluid paths into it"),
-]
 
 
-def week_plan(lines, g, m):
+def week_spec(lines, targets):
+    """One-week line list: R1, then the serpentinite lines in target order, cut to the targets.
+    Rows: line, priority, length [km], TEM loop [m], TEM step over the target / outside [m], AMT step [m], why."""
+    tmap = {t["id"]: t for t in targets}
+    spec = [("R1", "1", 1.0, 200, 100, 100, 0, "background resistivity and noise level: calibrates every other line")]
+    for ln in sorted((l for l in lines if l["target"] in tmap), key=lambda l: (l["id"][0] == "A", targets.index(tmap[l["target"]]))):
+        t = tmap[ln["target"]]
+        if ln["id"][0] == "A":
+            spec.append((ln["id"], "2", round(ln["length_m"] / 1000, 1), 100, 200, 200, 0,
+                         f"along the serpentinite belt {t['id']} (gravity {t['g_mgal']:.1f} mGal, RTP {t['rtp_nT']:.0f} nT): lateral continuity of water and alteration"))
+            continue
+        loop = 100 if t["top_depth"] < 150 else 200 if t["top_depth"] < 500 else 400
+        core, outer = {100: (50, 100), 200: (100, 100), 400: (200, 200)}[loop]
+        amt = 250 if t["centre_depth"] > 500 else 500 if ln["priority"] == "1" else 0
+        L_km = round(min(ln["length_m"] / 1000, 4.0 if loop >= 200 else 2.5), 1)       # deeper bodies: longer, to cross both contacts
+        spec.append((ln["id"], ln["priority"], L_km, loop, core, outer, amt,
+                     f"serpentinite candidate {t['id']}: Δρ {t['other_mean']:+.2f} g/cm³, χ {t['peak']:.3f} SI, top ≈ {t['top_depth']:.0f} m, "
+                     f"centre ≈ {t['centre_depth']:.0f} m, {t['agree']} of 3 models agree"))
+    return spec
+
+
+def week_plan(lines, targets, g, m):
+    """One-week campaign; drops the last lines while the schedule runs past WEEK_DAYS."""
+    spec = week_spec(lines, targets)
+    while True:
+        wl, st, sc = _week(lines, spec, g, m)
+        if st.day.max() <= WEEK_DAYS or len(spec) <= 2:
+            return wl, st, sc
+        spec = spec[:-1]
+
+
+def _week(lines, spec, g, m):
     """Lines, stations and day-by-day schedule of the one-week campaign."""
     from scipy.spatial import cKDTree
     tree = cKDTree(np.r_[g["data_xyz"][:, :2], m["data_xyz"][:, :2]])
     full = {ln["id"]: ln for ln in lines}
     wlines, rows = [], []
-    for lid, prio, L_km, loop, core, outer, amt, why in WEEK:
+    for lid, prio, L_km, loop, core, outer, amt, why in spec:
         src = full[lid]
         u = (src["b"] - src["a"]) / src["length_m"]
         mid = (src["a"] + src["b"]) / 2
         L = L_km * 1000.0
         a, b = mid - u * L / 2, mid + u * L / 2
+        if REGION is not None:
+            a, b = keep_inside(a, b, REGION)
+            L = float(np.hypot(*(b - a)))
         ln = dict(id=lid, target=src["target"], priority=prio, a=a, b=b, length_m=L, loop_m=loop, spacing_m=core, outer_m=outer,
                   amt_spacing_m=amt, purpose=why, method=("TEM + AMT" if loop and amt else "TEM central loop" if loop else "AMT"))
         sets = []
         if loop:
-            d = np.unique(np.round(np.r_[np.arange(0, L + 1, outer), np.arange(L / 2 - 500, L / 2 + 501, core), L], 1))
+            d = np.arange(0, L + 1, outer) if core == outer else np.r_[np.arange(0, L + 1, outer), np.arange(L / 2 - 500, L / 2 + 501, core), L]
+            d = np.unique(np.round(np.r_[d, L], 1))
             sets.append(("TEM", d[(d >= 0) & (d <= L)]))
         if amt:
             sets.append(("AMT", np.arange(0, L + 1, amt)))
@@ -466,7 +633,7 @@ def write_week(wlines, wst, sched, targets, g, m):
     with PdfPages(os.path.join(OUT, "EM_Survey_Week_Plan.pdf")) as pdf:
         fs = plt.figure(figsize=(16.5, 11.7))
         fs.text(0.04, 0.95, "Wadi Ghadir: one-week EM campaign (most important lines)", fontsize=18, weight="bold")
-        fs.text(0.04, 0.925, f"{AUTHOR} · priority 1 first; priority 2 lines are dropped first if time runs short · P1 regional AMT moves to a later campaign", fontsize=10)
+        fs.text(0.04, 0.925, f"{AUTHOR} · lines cross the low-density, high-susceptibility (serpentinite) bodies · priority 1 first · P1 regional AMT moves to a later campaign", fontsize=10)
         ax = fs.add_axes((0.04, 0.45, 0.92, 0.44))
         ax.axis("off")
         tb = ldf.drop(columns=["why"]).astype(str)
@@ -494,12 +661,12 @@ def main():
     mesh, act, rho, chi, g, m, targets, lines, st = compute()
 
     # tables
-    tdf = pd.DataFrame([{k: v for k, v in t.items() if k not in ("footprint", "strike", "score", "width")} for t in targets])
+    tdf = pd.DataFrame([{k: v for k, v in t.items() if k not in ("footprint", "strike", "score", "width", "rank", "pe", "pn")} for t in targets])
     tdf.insert(1, "lon", 0.0)
     tdf.insert(2, "lat", 0.0)
     tdf["lon"], tdf["lat"] = W.to_lonlat(tdf.e.values, tdf.n.values)
     tdf = tdf.round({"e": 0, "n": 0, "lon": 5, "lat": 5, "top_elev": 0, "bottom_elev": 0, "top_depth": 0, "centre_depth": 0, "peak": 3,
-                     "other_mean": 4, "dense_magnetic_share": 2, "volume_km3": 3})
+                     "other_mean": 3, "dense_magnetic_share": 2, "volume_km3": 3, "agree_share": 2, "g_mgal": 2, "rtp_nT": 0})
     ldf = pd.DataFrame([{"line": ln["id"], "target": ln["target"], "priority": ln["priority"], "method": ln["method"],
                          "loop_m": ln["loop_m"], "tem_spacing_m": ln["spacing_m"] if ln["loop_m"] else 0, "amt_spacing_m": ln["amt_spacing_m"],
                          "length_km": round(ln["length_m"] / 1000, 2), "tem_stations": ln["n_tem"], "amt_stations": ln["n_amt"],
@@ -562,12 +729,12 @@ def main():
     # summary page + PDF
     fig_sum = plt.figure(figsize=(16.5, 11.7))
     fig_sum.text(0.04, 0.95, "Wadi Ghadir, Eastern Desert, Egypt: ground EM survey plan", fontsize=18, weight="bold")
-    fig_sum.text(0.04, 0.925, f"{AUTHOR} · targets from the compact joint gravity-magnetic inversion (notebook 08) · UTM 36N, WGS 84", fontsize=10)
-    tb = tdf[["id", "kind", "lon", "lat", "top_depth", "centre_depth", "bottom_elev", "peak", "volume_km3", "dense_magnetic_share"]].copy()
+    fig_sum.text(0.04, 0.925, f"{AUTHOR} · H2 targets: low density and high susceptibility (serpentinite candidates) where the joint compact, separate compact and smooth inversions agree · UTM 36N, WGS 84", fontsize=10)
+    tb = tdf[["id", "kind", "lon", "lat", "top_depth", "centre_depth", "bottom_elev", "other_mean", "peak", "agree"]].copy()
     tb["top_depth"] = [f"{v:.0f}" if v >= 100 else "< 100 (near surface)" for v in tb.top_depth]
     tb["centre_depth"] = [f"{v:.0f}" for v in tb.centre_depth]
     tb["bottom_elev"] = [f"{v:.0f}" if v > ZMIN + 200 else f"below {ZMIN + 100:.0f}" for v in tb.bottom_elev]
-    tb.columns = ["target", "body", "lon", "lat", "depth to top [m]", "depth to centre [m]", "base elev. [m]", "peak Δρ [g/cm³] or χ [SI]", "volume [km³]", "dense+magnetic share"]
+    tb.columns = ["target", "body", "lon", "lat", "depth to top [m]", "depth to centre [m]", "base elev. [m]", "mean Δρ [g/cm³]", "mean χ [SI]", "models agreeing (of 3)"]
     ax = fig_sum.add_axes((0.04, 0.62, 0.92, 0.27))
     ax.axis("off")
     ax.set_title("Targets (expected depths from the compact model; potential-field depths are uncertain by ± a few hundred metres)", loc="left", fontsize=10)
@@ -610,10 +777,10 @@ def main():
         info["Title"] = "Wadi Ghadir EM survey plan"
         info["Author"] = "Mohamed Sobh, LIAG"
     plt.close("all")
-    print(tdf[["id", "kind", "e", "n", "top_depth", "centre_depth", "top_elev", "bottom_elev", "peak", "volume_km3", "dense_magnetic_share"]].to_string(index=False))
+    print(tdf[["id", "kind", "e", "n", "top_depth", "centre_depth", "other_mean", "peak", "agree", "agree_share", "g_mgal", "rtp_nT"]].to_string(index=False))
     print(ldf[["line", "target", "priority", "method", "loop_m", "length_km", "tem_stations", "amt_stations"]].to_string(index=False))
     print(f"stations: {len(st)}; median distance to an existing traverse {st.nearest_traverse_m.median():.0f} m")
-    wlines, wst, sched = week_plan(lines, g, m)
+    wlines, wst, sched = week_plan(lines, targets, g, m)
     write_week(wlines, wst, sched, targets, g, m)
     print("wrote", OUT)
 

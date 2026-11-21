@@ -91,7 +91,7 @@ button.sched { font: 500 12.5px var(--mono); background: var(--panel); color: va
 <header>
   <div class="eyebrow">Wadi Ghadir · Eastern Desert, Egypt · ground EM survey design</div>
   <h1>EM Survey Planner</h1>
-  <p class="lede">Where to measure TEM and AMT, and how deep to expect the targets, from the compact joint gravity–magnetic inversion. Pick a line on the map, set the host resistivity and loop, and see how far each sounding reaches against the target.</p>
+  <p class="lede">Where to measure TEM and AMT for natural hydrogen: every line crosses or follows rock with low density and high magnetic susceptibility (serpentinite candidates), picked where the data and three inversions agree. Pick a line on the map, set the host resistivity and loop, and see how far each sounding reaches against the target.</p>
   <div class="byline"><b>Written by Mohamed Sobh, LIAG</b> · Leibniz Institute for Applied Geophysics, Hannover</div>
 </header>
 
@@ -140,10 +140,10 @@ button.sched { font: 500 12.5px var(--mono); background: var(--panel); color: va
   <div class="tblwrap" style="max-height:none"><table id="tbl-h2">
     <thead><tr><th>H2 system element</th><th>Gravity and magnetics</th><th>What EM adds</th><th>Lines</th></tr></thead>
     <tbody>
-      <tr><td>Source: ultramafic rock</td><td>Serpentinised peridotite: low density, high χ. Fresh peridotite: dense, weakly magnetic</td><td>Separates dry, massive serpentinite (hundreds to thousands of Ωm) from fractured, wet, actively altering rock (10–100 Ωm) and connected magnetite (much lower)</td><td>L1, L2, L4, L5</td></tr>
+      <tr><td>Source: ultramafic rock</td><td>Serpentinised peridotite: low density, high χ (the targets S1–S3). Fresh peridotite: dense, weakly magnetic</td><td>Separates dry, massive serpentinite (hundreds to thousands of Ωm) from fractured, wet, actively altering rock (10–100 Ωm) and connected magnetite (much lower)</td><td>L1, L2, L3, A1</td></tr>
       <tr><td>Water for serpentinisation</td><td>Not visible</td><td>Fluid-bearing zones, depth to the water table, salinity (brines near the coast)</td><td>all TEM lines, R1</td></tr>
-      <tr><td>Pathways: faults, shear zones</td><td>Gradients and offsets between bodies</td><td>Narrow, steep conductors (fluids, clay gouge, graphite) traced to depth; AMT tipper and phase tensor give their strike and dip</td><td>L3, L4, P1</td></tr>
-      <tr><td>Reservoir and seal</td><td>Low-density body near the coast (sediments)</td><td>Depth to basement under the coastal plain, conductive clay or brine layers, resistive evaporite (anhydrite, halite) seals of the Red Sea margin</td><td>L6, P1</td></tr>
+      <tr><td>Pathways: faults, shear zones</td><td>Gradients and offsets between bodies</td><td>Narrow, steep conductors (fluids, clay gouge, graphite) traced to depth; AMT tipper and phase tensor give their strike and dip</td><td>AMT on L1–L3; P1 later</td></tr>
+      <tr><td>Reservoir and seal</td><td>Low-density body near the coast (sediments)</td><td>Depth to basement under the coastal plain, conductive clay or brine layers, resistive evaporite (anhydrite, halite) seals of the Red Sea margin</td><td>later campaign (coastal plain)</td></tr>
       <tr><td>Seeps and leakage</td><td>Not visible</td><td>Shallow conductive anomalies under sub-circular depressions ("fairy circles"), to be paired with soil-gas H2</td><td>priority 1 TEM lines</td></tr>
       <tr><td>Which mineral makes the anomaly</td><td>Magnetite, sulphide and graphite all look alike</td><td>Induced polarisation (TDIP) with resistivity tells magnetite from sulphide and graphite</td><td>L1, L2</td></tr>
     </tbody></table></div>
@@ -196,7 +196,7 @@ const PLANS = { week: { lines: D.week.lines, st: D.week.stations, secs: decodeSe
 let MODE = "week", LINES, ST, NST, SECS;
 function setPlan(m) { MODE = m; LINES = PLANS[m].lines; ST = PLANS[m].st; SECS = PLANS[m].secs; NST = ST.line.length; }
 setPlan("week");
-const KCOL = { magnetic: "#7b1fa2", dense: "#c62828", light: "#1565c0" };
+const KCOL = { serpentinite: "#00897b", magnetic: "#7b1fa2", dense: "#c62828", light: "#1565c0" };
 const lineColour = (ln) => (ln.method === "AMT" ? css("--amt") : ln.method.includes("AMT") ? "#8e44ad" : css("--tem"));
 function labelLine(g, ln, on, c, placed) {
   // id · priority · length in a halo box; tries both ends and four sides, keeps clear of labels already placed
@@ -213,7 +213,7 @@ function labelLine(g, ln, on, c, placed) {
   g.fillStyle = on ? css("--accent") : "rgba(255,255,255,.94)"; g.strokeStyle = c; g.lineWidth = 1.4; g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, 4) : g.rect(x, y, w, h); g.fill(); g.stroke();
   g.fillStyle = on ? css("--accent-ink") : "#111"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(tx, x + 4, y + h / 2 + 0.5);
 }
-const S = { layer: "relief", tracks: true, targets: true, st: true, sel: "L2", prop: "rho", lrho: 2.5, loop: "plan", cur: 10, noise: 1e-8, f: 10 };
+const S = { layer: "relief", tracks: true, targets: true, st: true, sel: "L1", prop: "rho", lrho: 2.5, loop: "plan", cur: 10, noise: 1e-8, f: 10 };
 
 // ---------------------------------------------------------------- helpers
 function lonlat(e, n) { const u = (e - D.ll.e0) / 1e4, v = (n - D.ll.n0) / 1e4, b = [1, u, v, u * u, u * v, v * v];
@@ -325,6 +325,7 @@ $("#cv-map").addEventListener("pointermove", (ev) => {
 
 // ---------------------------------------------------------------- line card
 const KIND_TEXT = {
+  serpentinite: "Low density and high susceptibility together: the signature of serpentinised ultramafic rock, the main natural-H2 source. EM asks whether it is wet and fractured (actively altering, 10–100 Ωm) or dry and massive, and where faults feed it with water.",
   magnetic: "Magnetic body: magnetite-bearing serpentinite or mafic rock (moderate resistivity), or pyrrhotite/sulphides (conductive). EM tells these apart.",
   dense: "Dense body: mafic or metavolcanic rock. Look for conductive shear zones and alteration along its contacts.",
   light: "Low-density body: granite, altered rock or sediments; near the coast possibly saline sediments and groundwater (conductive).",
@@ -340,17 +341,21 @@ function renderCard() {
     <dt>Start (west)</dt><dd>${la1.toFixed(5)}° N, ${lo1.toFixed(5)}° E</dd><dt>End</dt><dd>${la2.toFixed(5)}° N, ${lo2.toFixed(5)}° E</dd>`;
   if (L) h += `<dt>TEM sees to</dt><dd>~${Math.round(temDoi(L, r))} m at ${fmtRho(r)}</dd>`;
   if (ln.n_amt) h += `<dt>AMT sees to</dt><dd>~${Math.round(amtDoi(r, S.f))} m at ${fmtRho(r)}</dd>`;
-  h += `</dl><div class="k" style="margin-top:2px">Topography along the line</div><canvas id="cv-prof" aria-label="Elevation profile"></canvas><div class="readout" id="prof-stats"></div>`;
-  if (t) h += `<div class="phead" style="margin-top:4px"><h2 style="color:${KCOL[t.kind]}">Target ${t.id} · ${t.kind}</h2></div>
+  h += `</dl><div class="k" style="margin-top:2px">Topography along the line</div><canvas id="cv-prof" aria-label="Elevation profile"></canvas><div class="readout" id="prof-stats"></div>
+    <div class="k" style="margin-top:2px">Gravity and magnetics along the line</div><canvas id="cv-data" aria-label="Residual gravity and RTP along the line"></canvas>
+    <div class="readout">blue: residual Bouguer [mGal] · red: RTP magnetics [nT] · shaded: both show the serpentinite signature (gravity low, magnetic high)</div>`;
+  if (t) h += `<div class="phead" style="margin-top:4px"><h2 style="color:${KCOL[t.kind]}">Target ${t.id} · ${t.kind === "serpentinite" ? "serpentinite candidate" : t.kind}</h2></div>
     <dl class="kv"><dt>Depth to top</dt><dd>${t.top_depth < 100 ? "< 100 m (near surface)" : "≈ " + Math.round(t.top_depth) + " m"}</dd><dt>Depth to centre</dt><dd>≈ ${Math.round(t.centre_depth)} m</dd>
     <dt>Base</dt><dd>${t.bottom_elev > -2300 ? Math.round(t.bottom_elev) + " m elevation" : "below −2.4 km (not resolved)"}</dd>
-    <dt>Peak contrast</dt><dd>${t.kind === "magnetic" ? "χ " + t.peak.toFixed(2) + " SI" : "Δρ " + (t.peak > 0 ? "+" : "") + t.peak.toFixed(2) + " g/cm³"}</dd>
-    <dt>Volume</dt><dd>${t.volume_km3.toFixed(2)} km³</dd><dt>Dense and magnetic</dt><dd>${Math.round(t.dense_magnetic_share * 100)} % of its cells</dd></dl>
+    ${t.kind === "serpentinite" ? `<dt>Mean contrast</dt><dd>Δρ ${t.other_mean.toFixed(2)} g/cm³ · χ ${t.peak.toFixed(3)} SI</dd>
+    <dt>In the data</dt><dd>gravity ${t.g_mgal.toFixed(1)} mGal · RTP ${Math.round(t.rtp_nT)} nT</dd><dt>Models agreeing</dt><dd>${t.agree} of 3</dd></dl>`
+    : `<dt>Peak contrast</dt><dd>${t.kind === "magnetic" ? "χ " + t.peak.toFixed(2) + " SI" : "Δρ " + (t.peak > 0 ? "+" : "") + t.peak.toFixed(2) + " g/cm³"}</dd>
+    <dt>Volume</dt><dd>${t.volume_km3.toFixed(2)} km³</dd><dt>Dense and magnetic</dt><dd>${Math.round(t.dense_magnetic_share * 100)} % of its cells</dd></dl>`}
     <p class="note">${KIND_TEXT[t.kind]}</p>`;
   h += `<div class="lines">${LINES.map((l) => `<button data-id="${l.id}" aria-pressed="${l.id === S.sel}"><span class="dot" style="background:${l.target in TARGETS ? KCOL[TARGETS[l.target].kind] : lineColour(l)}"></span>${l.id}</button>`).join("")}</div>`;
   $("#card").innerHTML = h;
   $("#card").querySelectorAll(".lines button").forEach((b) => b.addEventListener("click", () => select(b.dataset.id)));
-  drawProfile();
+  drawProfile(); drawDataProfile();
 }
 
 
@@ -362,7 +367,7 @@ function profileOf(ln, step = 50) {
 }
 function drawProfile() {
   const cv = $("#cv-prof"); if (!cv) return;
-  const ln = sel(), { d, z } = profileOf(ln), w = cv.clientWidth || 300, H = 120, { g } = fitCanvas(cv, H), ml = 44, mr = 8, mt = 8, mb = 24, pw = w - ml - mr, ph = H - mt - mb;
+  const ln = sel(), pr = profileOf(ln), keep = pr.z.map(Number.isFinite), d = pr.d.filter((_, i) => keep[i]), z = pr.z.filter((_, i) => keep[i]), w = cv.clientWidth || 300, H = 120, { g } = fitCanvas(cv, H), ml = 44, mr = 8, mt = 8, mb = 24, pw = w - ml - mr, ph = H - mt - mb;
   const zmin = Math.min(...z), zmax = Math.max(...z), pad = Math.max(20, (zmax - zmin) * 0.15), lo = Math.max(0, zmin - pad), hi = zmax + pad;
   const X = (v) => ml + v / ln.length_m * pw, Y = (v) => mt + ph - (v - lo) / (hi - lo) * ph;
   g.fillStyle = css("--soft"); g.fillRect(ml, mt, pw, ph);
@@ -377,6 +382,26 @@ function drawProfile() {
   let smax = 0, climb = 0; for (let i = 1; i < z.length; i++) { const dz = z[i] - z[i - 1]; smax = Math.max(smax, Math.abs(dz) / (d[i] - d[i - 1])); if (dz > 0) climb += dz; }
   $("#prof-stats").textContent = `${Math.round(zmin)}–${Math.round(zmax)} m a.s.l. · relief ${Math.round(zmax - zmin)} m · total climb ${Math.round(climb)} m · steepest ${(Math.atan(smax) * 180 / Math.PI).toFixed(0)}° (200 m DEM)` +
     (Math.atan(smax) * 180 / Math.PI > 15 ? " · steep: lay loops on the flatter parts" : "");
+}
+
+function gridAt(arr, e, n) { const i = Math.floor((e - T.x0) / 100), j = Math.floor((T.y1 - n) / 100); if (i < 0 || j < 0 || i >= GR.nx || j >= GR.ny) return NaN; const v = arr[j * GR.nx + i]; return v === -32768 ? NaN : v; }
+function drawDataProfile() {
+  const cv = $("#cv-data"); if (!cv) return;
+  const ln = sel(), n = 120, d = [], gv = [], rv = [];
+  for (let i = 0; i <= n; i++) { const t = i / n, e = ln.a[0] + t * (ln.b[0] - ln.a[0]), y = ln.a[1] + t * (ln.b[1] - ln.a[1]); d.push(t * ln.length_m); gv.push(gridAt(GRAV, e, y) / 100); rv.push(gridAt(RTP, e, y)); }
+  const w = cv.clientWidth || 300, H = 130, { g } = fitCanvas(cv, H), ml = 44, mr = 48, mt = 8, mb = 22, pw = w - ml - mr, ph = H - mt - mb;
+  const fin = (a) => a.filter(Number.isFinite), gl = Math.max(1, ...fin(gv).map(Math.abs)), rl = Math.max(50, ...fin(rv).map(Math.abs));
+  const X = (x) => ml + x / ln.length_m * pw, YG = (v) => mt + ph / 2 - v / gl * ph / 2, YR = (v) => mt + ph / 2 - v / rl * ph / 2;
+  g.fillStyle = css("--soft"); g.fillRect(ml, mt, pw, ph);
+  g.fillStyle = "rgba(0,137,123,.2)"; for (let i = 0; i < n; i++) if (gv[i] < 0 && rv[i] > 0) g.fillRect(X(d[i]), mt, X(d[i + 1]) - X(d[i]) + 0.5, ph);
+  g.strokeStyle = css("--line"); g.beginPath(); g.moveTo(ml, mt + ph / 2); g.lineTo(ml + pw, mt + ph / 2); g.stroke();
+  const plot = (arr, Y, c) => { g.strokeStyle = c; g.lineWidth = 2; g.beginPath(); let on = false; arr.forEach((v, i) => { if (!Number.isFinite(v)) { on = false; return; } on ? g.lineTo(X(d[i]), Y(v)) : g.moveTo(X(d[i]), Y(v)); on = true; }); g.stroke(); };
+  plot(gv, YG, "#1565c0"); plot(rv, YR, "#c62828");
+  g.font = "10.5px " + css("--mono"); g.textBaseline = "middle"; g.fillStyle = "#1565c0"; g.textAlign = "right"; g.fillText("+" + gl.toFixed(1), ml - 4, mt + 6); g.fillText("−" + gl.toFixed(1), ml - 4, mt + ph - 6);
+  g.fillStyle = "#c62828"; g.textAlign = "left"; g.fillText("+" + Math.round(rl), ml + pw + 4, mt + 6); g.fillText("−" + Math.round(rl), ml + pw + 4, mt + ph - 6);
+  g.fillStyle = css("--muted"); g.textAlign = "center"; g.textBaseline = "top"; const st = niceStep(ln.length_m, 5);
+  for (let x = 0; x <= ln.length_m + 1; x += st) g.fillText((x / 1000).toFixed(st < 1000 ? 1 : 0), X(x), mt + ph + 4);
+  g.strokeStyle = css("--line"); g.strokeRect(ml + 0.5, mt + 0.5, pw, ph);
 }
 
 // ---------------------------------------------------------------- section
@@ -441,6 +466,7 @@ $("#cv-sec").addEventListener("pointermove", (ev) => {
 
 // ---------------------------------------------------------------- H2 roles of the targets
 function h2Role(t) {
+  if (t.kind === "serpentinite") return [`Serpentinite candidate (Δρ ${t.other_mean.toFixed(2)} g/cm³, χ ${t.peak.toFixed(3)} SI; data: ${t.g_mgal.toFixed(1)} mGal, ${Math.round(t.rtp_nT)} nT)`, `Primary H2 source candidate (${t.agree} of 3 models agree). Is it wet and fractured (actively altering, 10–100 Ωm) or dry? Where do conductive faults bring water in?`];
   if (t.kind === "magnetic" && t.other_mean <= -0.02) return ["Serpentinised ultramafic (light and magnetic)", "Possible H2 source. Is it wet and fractured (active, 10–100 Ωm) or dry and massive (spent)?"];
   if (t.kind === "magnetic" && t.other_mean >= 0.02) return ["Partly serpentinised peridotite or magnetite-rich gabbro (dense and magnetic)", "Possible active serpentinisation front: look for conductive fluid zones and IP response at its margins."];
   if (t.kind === "magnetic") return ["Magnetic, density neutral", "Serpentinite mixed with denser rock, or magnetite-rich mafic rock: resistivity and IP separate the two."];
@@ -528,7 +554,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", redraw);
 new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 function renderSchedule() {
   const on = MODE === "week"; $("#sched-panel").hidden = !on;
-  $("#mode-note").innerHTML = on ? `<b>One-week campaign.</b> The ${LINES.length} most important lines, shortened to the targets, with dense stations only over each target. A TEM crew and an AMT crew work in parallel. Priority 1 lines (R1, L2, L1, L4) come first; priority 2 lines (L5, L6, L3) close the week and are the first to drop if time runs short. The 23.8 km regional AMT traverse P1 (faint grey) moves to a later campaign. Record soil gas (H2, CH4, CO2, He, Rn) at every TEM station.`
+  $("#mode-note").innerHTML = on ? `<b>One-week campaign.</b> The ${LINES.length} most important lines, shortened to the targets, with dense stations only over each target. A TEM crew and an AMT crew work in parallel. Every line crosses or follows a body with <b>low density and high susceptibility</b> (serpentinite, the H2 source rock), shown by a gravity low and a magnetic high in the data and in the models. Priority 1: ${LINES.filter((l) => l.priority === "1").map((l) => l.id).join(", ")}; priority 2: ${LINES.filter((l) => l.priority !== "1").map((l) => l.id).join(", ") || "none"}, first to drop if time runs short. The regional AMT traverse P1 (grey dashed) moves to a later campaign. Record soil gas (H2, CH4, CO2, He, Rn) at every TEM station.`
     : `<b>Full plan.</b> All ${LINES.length} lines at their full length with a single crew; about four weeks of fieldwork.`;
   if (!on) return;
   const sc = D.week.schedule, days = Math.max(...sc.map((r) => r.day)), crews = ["TEM crew", "AMT crew"];
@@ -541,7 +567,7 @@ function renderSchedule() {
 }
 $("#seg-mode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b || b.dataset.v === MODE) return;
   $("#seg-mode").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); setPlan(b.dataset.v);
-  if (!LINES.some((l) => l.id === S.sel)) S.sel = "L2"; renderStats(); renderSchedule(); select(S.sel); });
+  if (!LINES.some((l) => l.id === S.sel)) S.sel = "L1"; renderStats(); renderSchedule(); select(S.sel); });
 try { const s = localStorage.getItem("wgem-line"); if (s && LINES.some((l) => l.id === s)) S.sel = s; } catch (e) { /* storage unavailable */ }
 renderStats(); renderSchedule(); renderH2(); $("#lab-rho").textContent = fmtRho(rhoHost()); select(S.sel); drawDoi(); drawRes();
 </script>

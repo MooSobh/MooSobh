@@ -83,8 +83,9 @@ the anomalous cells under the terrain, side-by-side comparison of any two models
 units), the data fit of every model (maps, cross-plot, residual histogram) and the convergence of every run. Rebuild it
 with `python scripts/build_inversion_explorer.py` after running the notebooks.
 
-**EM survey design:** `python scripts/design_em_survey.py` picks EM targets from the compact joint inversion
-(magnetic, dense and light bodies in well-constrained cells), lays TEM lines across their strike with loop sizes and
+**EM survey design (natural hydrogen):** `python scripts/design_em_survey.py` picks serpentinite candidates, i.e. rock with
+low density and high susceptibility where the residual gravity low and RTP high in the data and three inversions
+(joint compact, separate compact, smooth) agree, lays TEM lines across their strike with loop sizes and
 station spacings chosen from the depth to their tops, adds a regional AMT traverse along A–B and a reference line, and
 writes `outputs/em_survey/`: the plan sheets `EM_Survey_Plan.pdf` (summary, plan maps, sections with expected depths and
 depths of investigation, expected resistivities), the station list (CSV) and `em_survey.gpx` / `.kml` for field GPS.

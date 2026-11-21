@@ -69,7 +69,7 @@ def main():
     args = ap.parse_args()
     mesh, act, rho, chi, g, m, targets, lines, st = E.compute()
     T = terrain(mesh, 5)
-    wlines, wst, sched = E.week_plan(lines, g, m)
+    wlines, wst, sched = E.week_plan(lines, targets, g, m)
 
     def sec_of(ln):
         d, zc, R = W.section(mesh, rho, tuple(ln["a"]), tuple(ln["b"]), step=50.0, zmin=E.ZMIN)
@@ -89,7 +89,8 @@ def main():
         lon, lat = W.to_lonlat(t["e"], t["n"])
         tlist.append({"id": t["id"], "kind": t["kind"], "e": t["e"], "n": t["n"], "lon": float(lon), "lat": float(lat),
                       "top_depth": t["top_depth"], "centre_depth": t["centre_depth"], "bottom_elev": t["bottom_elev"],
-                      "peak": t["peak"], "other_mean": float(t["other_mean"]), "volume_km3": t["volume_km3"], "dense_magnetic_share": t["dense_magnetic_share"],
+                      "peak": t["peak"], "other_mean": float(t["other_mean"]), "agree": int(t.get("agree", 0)), "agree_share": float(t.get("agree_share", 0)),
+                      "g_mgal": float(t.get("g_mgal", np.nan)), "rtp_nT": float(t.get("rtp_nT", np.nan)), "volume_km3": t["volume_km3"], "dense_magnetic_share": t["dense_magnetic_share"],
                       "hull": np.round(hull, 1).tolist()})
     wlist = [{"id": ln["id"], "target": ln["target"], "priority": ln["priority"], "method": ln["method"], "loop_m": ln["loop_m"],
               "spacing_m": ln["spacing_m"], "outer_m": ln["outer_m"], "amt_spacing_m": ln["amt_spacing_m"], "length_m": ln["length_m"],
